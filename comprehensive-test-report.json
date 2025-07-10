@@ -1,0 +1,130 @@
+{
+  "timestamp": "2025-06-17T09:09:34.229Z",
+  "testResults": [
+    {
+      "timestamp": "2025-06-17T09:09:33.126Z",
+      "type": "info",
+      "message": "Starting comprehensive system test..."
+    },
+    {
+      "timestamp": "2025-06-17T09:09:33.129Z",
+      "type": "info",
+      "message": "\n=== Running Health Check Tests ==="
+    },
+    {
+      "timestamp": "2025-06-17T09:09:33.129Z",
+      "type": "info",
+      "message": "Testing health check endpoint..."
+    },
+    {
+      "timestamp": "2025-06-17T09:09:33.173Z",
+      "type": "info",
+      "message": "✅ Health check passed"
+    },
+    {
+      "timestamp": "2025-06-17T09:09:33.174Z",
+      "type": "info",
+      "message": "\n=== Running Authentication Tests ==="
+    },
+    {
+      "timestamp": "2025-06-17T09:09:33.174Z",
+      "type": "info",
+      "message": "Testing user authentication system..."
+    },
+    {
+      "timestamp": "2025-06-17T09:09:33.198Z",
+      "type": "error",
+      "message": "❌ Registration failed for admin: [object Object]"
+    },
+    {
+      "timestamp": "2025-06-17T09:09:33.553Z",
+      "type": "error",
+      "message": "❌ Login failed for admin: undefined"
+    },
+    {
+      "timestamp": "2025-06-17T09:09:33.558Z",
+      "type": "error",
+      "message": "❌ Registration failed for cashier: [object Object]"
+    },
+    {
+      "timestamp": "2025-06-17T09:09:33.882Z",
+      "type": "error",
+      "message": "❌ Login failed for cashier: undefined"
+    },
+    {
+      "timestamp": "2025-06-17T09:09:33.886Z",
+      "type": "error",
+      "message": "❌ Registration failed for warehouse: [object Object]"
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.214Z",
+      "type": "error",
+      "message": "❌ Login failed for warehouse: undefined"
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.219Z",
+      "type": "error",
+      "message": "❌ Registration failed for customer: [object Object]"
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.226Z",
+      "type": "error",
+      "message": "❌ Login failed for customer: [object Object]"
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.226Z",
+      "type": "info",
+      "message": "Authentication tests: 0/8 passed"
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.226Z",
+      "type": "info",
+      "message": "\n=== Running Order Management Tests ==="
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.227Z",
+      "type": "info",
+      "message": "Testing order management system..."
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.227Z",
+      "type": "error",
+      "message": "❌ Cannot test orders - missing auth tokens"
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.227Z",
+      "type": "info",
+      "message": "\n=== Running Inventory Management Tests ==="
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.228Z",
+      "type": "info",
+      "message": "Testing inventory management system..."
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.228Z",
+      "type": "error",
+      "message": "❌ Cannot test inventory - missing auth tokens"
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.228Z",
+      "type": "info",
+      "message": "\n=== Running Admin Functions Tests ==="
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.229Z",
+      "type": "info",
+      "message": "Testing admin functions..."
+    },
+    {
+      "timestamp": "2025-06-17T09:09:34.229Z",
+      "type": "error",
+      "message": "❌ Cannot test admin functions - missing admin token"
+    }
+  ],
+  "summary": {
+    "totalTests": 12,
+    "passedTests": 1,
+    "failedTests": 11
+  }
+}

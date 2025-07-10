@@ -17,14 +17,14 @@ router.get('/', authenticateToken, adminOnly, async (req, res) => {
       sortBy = 'createdAt',
       sortOrder = 'desc'
     } = req.query;
-    
+
     // Build query
     let query = {};
-    
+
     if (role) query.role = role;
     if (isActive !== undefined) query.isActive = isActive === 'true';
     if (isApproved !== undefined) query.isApproved = isApproved === 'true';
-    
+
     // Search functionality
     if (search) {
       query.$or = [
@@ -33,22 +33,22 @@ router.get('/', authenticateToken, adminOnly, async (req, res) => {
         { username: new RegExp(search, 'i') }
       ];
     }
-    
+
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const sortObj = {};
     sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
-    
+
     const users = await User.find(query)
       .select('-password -refreshTokens')
       .populate('approvedBy', 'fullName username')
       .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit));
-    
+
     const totalUsers = await User.countDocuments(query);
     const totalPages = Math.ceil(totalUsers / parseInt(limit));
-    
+
     res.json({
       success: true,
       users,
@@ -60,7 +60,7 @@ router.get('/', authenticateToken, adminOnly, async (req, res) => {
         hasPreviousPage: parseInt(page) > 1
       }
     });
-    
+
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({
@@ -78,7 +78,7 @@ router.get('/stats', authenticateToken, adminOnly, async (req, res) => {
     const activeUsers = await User.countDocuments({ isActive: true });
     const approvedUsers = await User.countDocuments({ isApproved: true });
     const pendingUsers = await User.countDocuments({ isApproved: false, isActive: true });
-    
+
     const roleDistribution = await User.aggregate([
       {
         $group: {
@@ -88,12 +88,12 @@ router.get('/stats', authenticateToken, adminOnly, async (req, res) => {
       },
       { $sort: { count: -1 } }
     ]);
-    
+
     const recentUsers = await User.find()
       .select('fullName username email role createdAt isActive isApproved')
       .sort({ createdAt: -1 })
       .limit(10);
-    
+
     const loginStats = await User.aggregate([
       {
         $group: {
@@ -112,7 +112,7 @@ router.get('/stats', authenticateToken, adminOnly, async (req, res) => {
         }
       }
     ]);
-    
+
     res.json({
       success: true,
       stats: {
@@ -130,7 +130,7 @@ router.get('/stats', authenticateToken, adminOnly, async (req, res) => {
         }
       }
     });
-    
+
   } catch (error) {
     console.error('Get user stats error:', error);
     res.status(500).json({
@@ -152,11 +152,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
         errorType: 'ACCESS_DENIED'
       });
     }
-    
+
     const user = await User.findById(req.params.id)
       .select('-password -refreshTokens')
       .populate('approvedBy', 'fullName username');
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -164,12 +164,12 @@ router.get('/:id', authenticateToken, async (req, res) => {
         errorType: 'USER_NOT_FOUND'
       });
     }
-    
+
     res.json({
       success: true,
       user
     });
-    
+
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({
@@ -180,12 +180,113 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// Create new user (admin only)
+router.post('/', authenticateToken, adminOnly, async (req, res) => {
+  try {
+    const {
+      username,
+      email,
+      password,
+      fullName,
+      phone,
+      role = 'customer',
+      nicNumber,
+      address
+    } = req.body;
+
+    // Validate required fields
+    if (!username || !email || !password || !fullName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Username, email, password, and full name are required',
+        errorType: 'VALIDATION_ERROR'
+      });
+    }
+
+    // Validate role
+    const validRoles = ['admin', 'user', 'warehouse', 'cashier', 'customer', 'driver', 'editor'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid role',
+        errorType: 'INVALID_ROLE'
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }]
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        error: 'User with this email or username already exists',
+        errorType: 'USER_EXISTS'
+      });
+    }
+
+    // Create new user
+    const newUser = new User({
+      username,
+      email,
+      password, // Will be hashed by the pre-save middleware
+      fullName,
+      phone,
+      role,
+      nicNumber,
+      address,
+      isActive: true,
+      isApproved: ['admin', 'cashier', 'warehouse'].includes(role) ? true : false, // Auto-approve staff
+      approvedBy: ['admin', 'cashier', 'warehouse'].includes(role) ? req.user._id : null
+    });
+
+    await newUser.save();
+
+    // Return user without password
+    const userResponse = await User.findById(newUser._id)
+      .select('-password -refreshTokens')
+      .populate('approvedBy', 'fullName username');
+
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      user: userResponse
+    });
+
+  } catch (error) {
+    console.error('Create user error:', error);
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        error: 'Email or username already exists',
+        errorType: 'DUPLICATE_KEY'
+      });
+    }
+
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        error: Object.values(error.errors).map(e => e.message).join(', '),
+        errorType: 'VALIDATION_ERROR'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create user',
+      errorType: 'CREATE_USER_ERROR'
+    });
+  }
+});
+
 // Update user (admin or self with restrictions)
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const isAdmin = req.user.role === 'admin';
     const isSelf = req.user._id.toString() === req.params.id;
-    
+
     if (!isAdmin && !isSelf) {
       return res.status(403).json({
         success: false,
@@ -193,23 +294,23 @@ router.put('/:id', authenticateToken, async (req, res) => {
         errorType: 'ACCESS_DENIED'
       });
     }
-    
+
     // Define allowed updates based on role
     let allowedUpdates = [];
-    
+
     if (isAdmin) {
       allowedUpdates = ['fullName', 'email', 'phone', 'role', 'isActive', 'isApproved', 'address', 'preferences'];
     } else if (isSelf) {
       allowedUpdates = ['fullName', 'phone', 'address', 'preferences'];
     }
-    
+
     const updates = {};
     Object.keys(req.body).forEach(key => {
       if (allowedUpdates.includes(key)) {
         updates[key] = req.body[key];
       }
     });
-    
+
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({
         success: false,
@@ -217,7 +318,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         errorType: 'NO_UPDATES'
       });
     }
-    
+
     // Additional validation for admin updates
     if (isAdmin && updates.role) {
       const validRoles = ['admin', 'user', 'warehouse', 'cashier', 'customer', 'driver', 'editor'];
@@ -229,14 +330,14 @@ router.put('/:id', authenticateToken, async (req, res) => {
         });
       }
     }
-    
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
       updates,
       { new: true, runValidators: true }
     ).select('-password -refreshTokens')
-     .populate('approvedBy', 'fullName username');
-    
+      .populate('approvedBy', 'fullName username');
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -244,16 +345,16 @@ router.put('/:id', authenticateToken, async (req, res) => {
         errorType: 'USER_NOT_FOUND'
       });
     }
-    
+
     res.json({
       success: true,
       message: 'User updated successfully',
       user
     });
-    
+
   } catch (error) {
     console.error('Update user error:', error);
-    
+
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
@@ -261,7 +362,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         errorType: 'DUPLICATE_KEY'
       });
     }
-    
+
     if (error.name === 'ValidationError') {
       return res.status(400).json({
         success: false,
@@ -269,7 +370,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         errorType: 'VALIDATION_ERROR'
       });
     }
-    
+
     res.status(500).json({
       success: false,
       error: 'Failed to update user',
@@ -282,7 +383,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 router.delete('/:id', authenticateToken, adminOnly, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -290,7 +391,7 @@ router.delete('/:id', authenticateToken, adminOnly, async (req, res) => {
         errorType: 'USER_NOT_FOUND'
       });
     }
-    
+
     // Prevent admin from deleting themselves
     if (user._id.toString() === req.user._id.toString()) {
       return res.status(400).json({
@@ -299,16 +400,16 @@ router.delete('/:id', authenticateToken, adminOnly, async (req, res) => {
         errorType: 'CANNOT_DELETE_SELF'
       });
     }
-    
+
     // Soft delete by deactivating the user
     user.isActive = false;
     await user.save();
-    
+
     res.json({
       success: true,
       message: 'User deleted successfully'
     });
-    
+
   } catch (error) {
     console.error('Delete user error:', error);
     res.status(500).json({
@@ -323,7 +424,7 @@ router.delete('/:id', authenticateToken, adminOnly, async (req, res) => {
 router.post('/bulk', authenticateToken, adminOnly, async (req, res) => {
   try {
     const { action, userIds, data } = req.body;
-    
+
     if (!action || !Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({
         success: false,
@@ -331,9 +432,9 @@ router.post('/bulk', authenticateToken, adminOnly, async (req, res) => {
         errorType: 'VALIDATION_ERROR'
       });
     }
-    
+
     const validActions = ['activate', 'deactivate', 'approve', 'reject', 'updateRole'];
-    
+
     if (!validActions.includes(action)) {
       return res.status(400).json({
         success: false,
@@ -341,9 +442,9 @@ router.post('/bulk', authenticateToken, adminOnly, async (req, res) => {
         errorType: 'INVALID_ACTION'
       });
     }
-    
+
     let updateData = {};
-    
+
     switch (action) {
       case 'activate':
         updateData = { isActive: true };
@@ -352,16 +453,16 @@ router.post('/bulk', authenticateToken, adminOnly, async (req, res) => {
         updateData = { isActive: false };
         break;
       case 'approve':
-        updateData = { 
-          isApproved: true, 
+        updateData = {
+          isApproved: true,
           emailVerified: true,
           approvedBy: req.user._id,
           approvedAt: new Date()
         };
         break;
       case 'reject':
-        updateData = { 
-          isActive: false, 
+        updateData = {
+          isActive: false,
           rejectedAt: new Date(),
           rejectionReason: data?.reason || 'Bulk rejection'
         };
@@ -377,22 +478,22 @@ router.post('/bulk', authenticateToken, adminOnly, async (req, res) => {
         updateData = { role: data.role };
         break;
     }
-    
+
     const result = await User.updateMany(
-      { 
+      {
         _id: { $in: userIds },
         _id: { $ne: req.user._id } // Prevent admin from affecting their own account
       },
       updateData
     );
-    
+
     res.json({
       success: true,
       message: `Bulk ${action} completed successfully`,
       modifiedCount: result.modifiedCount,
       matchedCount: result.matchedCount
     });
-    
+
   } catch (error) {
     console.error('Bulk user operation error:', error);
     res.status(500).json({
@@ -414,10 +515,10 @@ router.get('/:id/activity', authenticateToken, async (req, res) => {
         errorType: 'ACCESS_DENIED'
       });
     }
-    
+
     const user = await User.findById(req.params.id)
       .select('fullName username lastLogin loginCount createdAt');
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -425,10 +526,10 @@ router.get('/:id/activity', authenticateToken, async (req, res) => {
         errorType: 'USER_NOT_FOUND'
       });
     }
-    
+
     // You could expand this to include more detailed activity tracking
     // by creating an Activity model and tracking user actions
-    
+
     const activity = {
       user: {
         name: user.fullName,
@@ -438,16 +539,16 @@ router.get('/:id/activity', authenticateToken, async (req, res) => {
       loginStats: {
         lastLogin: user.lastLogin,
         totalLogins: user.loginCount,
-        averageLoginsPerDay: user.loginCount > 0 ? 
+        averageLoginsPerDay: user.loginCount > 0 ?
           user.loginCount / Math.max(1, Math.floor((Date.now() - user.createdAt.getTime()) / (24 * 60 * 60 * 1000))) : 0
       }
     };
-    
+
     res.json({
       success: true,
       activity
     });
-    
+
   } catch (error) {
     console.error('Get user activity error:', error);
     res.status(500).json({
@@ -462,7 +563,7 @@ router.get('/:id/activity', authenticateToken, async (req, res) => {
 router.post('/:id/reset-password', authenticateToken, adminOnly, async (req, res) => {
   try {
     const { newPassword } = req.body;
-    
+
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({
         success: false,
@@ -470,9 +571,9 @@ router.post('/:id/reset-password', authenticateToken, adminOnly, async (req, res
         errorType: 'VALIDATION_ERROR'
       });
     }
-    
+
     const user = await User.findById(req.params.id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -480,17 +581,17 @@ router.post('/:id/reset-password', authenticateToken, adminOnly, async (req, res
         errorType: 'USER_NOT_FOUND'
       });
     }
-    
+
     // Update password
     user.password = newPassword;
     user.refreshTokens = []; // Clear all refresh tokens
     await user.save();
-    
+
     res.json({
       success: true,
       message: 'Password reset successfully'
     });
-    
+
   } catch (error) {
     console.error('Reset password error:', error);
     res.status(500).json({
@@ -506,7 +607,7 @@ router.get('/role/:role', authenticateToken, authorize('admin', 'cashier'), asyn
   try {
     const { role } = req.params;
     const validRoles = ['admin', 'user', 'warehouse', 'cashier', 'customer', 'driver', 'editor'];
-    
+
     if (!validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
@@ -514,21 +615,21 @@ router.get('/role/:role', authenticateToken, authorize('admin', 'cashier'), asyn
         errorType: 'INVALID_ROLE'
       });
     }
-    
+
     const users = await User.find({
       role,
       isActive: true,
       isApproved: true
     }).select('fullName username email phone role createdAt')
       .sort({ fullName: 1 });
-    
+
     res.json({
       success: true,
       users,
       role,
       count: users.length
     });
-    
+
   } catch (error) {
     console.error('Get users by role error:', error);
     res.status(500).json({

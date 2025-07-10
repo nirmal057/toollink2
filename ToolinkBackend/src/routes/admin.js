@@ -32,6 +32,37 @@ router.get('/dashboard', (req, res) => {
   });
 });
 
+// Activity logs route
+router.get('/activities', (req, res) => {
+  console.log('📋 Admin activities route hit');
+  res.json({
+    success: true,
+    activities: [
+      {
+        id: 1,
+        type: 'user_login',
+        user: 'john.doe@example.com',
+        timestamp: new Date().toISOString(),
+        details: 'User logged in successfully'
+      },
+      {
+        id: 2,
+        type: 'order_created',
+        user: 'jane.smith@example.com',
+        timestamp: new Date(Date.now() - 300000).toISOString(),
+        details: 'Order #12345 created'
+      },
+      {
+        id: 3,
+        type: 'inventory_updated',
+        user: 'admin@example.com',
+        timestamp: new Date(Date.now() - 600000).toISOString(),
+        details: 'Product ABC123 stock updated'
+      }
+    ]
+  });
+});
+
 console.log('✅ Admin routes loaded successfully');
 
 module.exports = router;

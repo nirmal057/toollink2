@@ -25,12 +25,21 @@ const upload = multer({
     }
 });
 
-// Validation rules
-const userValidation = [
+// Validation rules for creating users
+const createUserValidation = [
     body('name').notEmpty().withMessage('Name is required').trim(),
     body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
     body('role').isIn(['Admin', 'Warehouse Manager', 'Cashier', 'Customer']).withMessage('Invalid role'),
+    body('status').optional().isIn(['Active', 'Inactive', 'Approved', 'Pending']).withMessage('Invalid status')
+];
+
+// Validation rules for updating users
+const updateUserValidation = [
+    body('name').optional().notEmpty().withMessage('Name is required').trim(),
+    body('email').optional().isEmail().withMessage('Valid email is required').normalizeEmail(),
+    body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+    body('role').optional().isIn(['Admin', 'Warehouse Manager', 'Cashier', 'Customer']).withMessage('Invalid role'),
     body('status').optional().isIn(['Active', 'Inactive', 'Approved', 'Pending']).withMessage('Invalid status')
 ];
 
@@ -92,7 +101,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/users - Create a new user
-router.post('/', userValidation, async (req, res) => {
+router.post('/', createUserValidation, async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -146,8 +155,37 @@ router.post('/', userValidation, async (req, res) => {
     }
 });
 
+// GET /api/users/:id - Get a single user by ID
+router.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const user = await User.findById(id).select('-password');
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: user
+        });
+
+        logger.info(`User fetched by ID: ${id}`);
+    } catch (error) {
+        logger.error('Error fetching user by ID:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching user',
+            error: error.message
+        });
+    }
+});
+
 // PUT /api/users/:id - Update a user by ID
-router.put('/:id', userValidation, async (req, res) => {
+router.put('/:id', updateUserValidation, async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -170,7 +208,7 @@ router.put('/:id', userValidation, async (req, res) => {
         }
 
         // Check if email is being changed and if it already exists
-        if (email !== user.email) {
+        if (email && email !== user.email) {
             const existingUser = await User.findOne({ email });
             if (existingUser) {
                 return res.status(400).json({
@@ -180,12 +218,12 @@ router.put('/:id', userValidation, async (req, res) => {
             }
         }
 
-        // Update user fields
-        user.name = name;
-        user.email = email;
+        // Update user fields only if provided
+        if (name) user.name = name;
+        if (email) user.email = email;
         if (password) user.password = password; // Will be hashed by pre-save hook
-        user.role = role;
-        user.status = status;
+        if (role) user.role = role;
+        if (status) user.status = status;
 
         await user.save();
 

@@ -1,640 +1,526 @@
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const Notification = require('../models/Notification');
-const { generateTokens, authenticateToken, verifyRefreshToken, authRateLimit } = require('../middleware/auth');
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { body, validationResult } from 'express-validator';
+import User from '../models/User.js';
+import { generateTokens, verifyRefreshToken } from '../middleware/auth.js';
+import logger from '../utils/logger.js';
+import { sendEmail } from '../utils/emailService.js';
+import crypto from 'crypto';
 
 const router = express.Router();
 
-// Register new user
-router.post('/register', authRateLimit(3, 15 * 60 * 1000), async (req, res) => {
-  try {
-    const { username, email, password, fullName, phone, role } = req.body;
-    
-    // Validation
-    if (!username || !email || !password || !fullName) {
-      return res.status(400).json({
-        success: false,
-        error: 'Username, email, password, and full name are required',
-        errorType: 'VALIDATION_ERROR'
-      });
-    }
-    
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        error: 'Password must be at least 6 characters long',
-        errorType: 'VALIDATION_ERROR'
-      });
-    }
-    
-    // Check if user already exists
-    const existingUser = await User.findOne({
-      $or: [
-        { email: email.toLowerCase() },
-        { username: username.toLowerCase() }
-      ]
-    });
-    
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        error: existingUser.email === email.toLowerCase() ? 'Email already registered' : 'Username already taken',
-        errorType: 'USER_EXISTS'
-      });
-    }
-    
-    // Create new user
-    const userData = {
-      username: username.toLowerCase(),
-      email: email.toLowerCase(),
-      password,
-      fullName,
-      phone,
-      role: role && ['admin', 'user', 'warehouse', 'cashier', 'customer', 'driver', 'editor'].includes(role) ? role : 'customer'
-    };
-    
-    // Auto-approve admins and certain privileged roles
-    if (['admin', 'cashier', 'warehouse'].includes(userData.role)) {
-      userData.isApproved = true;
-      userData.emailVerified = true;
-    }
-    
-    const user = new User(userData);
-    await user.save();
-    
-    // Create notification for admins/cashiers if customer requires approval
-    if (!userData.isApproved && userData.role === 'customer') {
-      try {
-        // Get all admins and cashiers
-        const approvers = await User.find({ 
-          role: { $in: ['admin', 'cashier'] },
-          isApproved: true 
+// Validation rules
+const loginValidation = [
+    body('email').isEmail().normalizeEmail(),
+    body('password').isLength({ min: 6 })
+];
+
+const registerValidation = [
+    body('username').trim().isLength({ min: 3, max: 50 }),
+    body('email').isEmail().normalizeEmail(),
+    body('password').isLength({ min: 6 }),
+    body('fullName').trim().isLength({ min: 2, max: 100 }),
+    body('phone').optional().isMobilePhone(),
+    body('role').optional().isIn(['customer', 'user', 'warehouse', 'cashier', 'driver', 'editor'])
+];
+
+// Login endpoint
+router.post('/login', loginValidation, async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: errors.array()
+            });
+        }
+
+        const { email, password } = req.body;
+
+        // Find user by email or username
+        const user = await User.findByEmailOrUsername(email);
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid credentials',
+                errorType: 'INVALID_CREDENTIALS'
+            });
+        }
+
+        // Check if account is locked
+        if (user.isLocked) {
+            return res.status(423).json({
+                success: false,
+                error: 'Account is temporarily locked due to multiple failed login attempts',
+                errorType: 'ACCOUNT_LOCKED'
+            });
+        }
+
+        // Check if account is active
+        if (!user.isActive) {
+            return res.status(401).json({
+                success: false,
+                error: 'Account is inactive',
+                errorType: 'ACCOUNT_INACTIVE'
+            });
+        }
+
+        // Check if account is approved
+        if (!user.isApproved) {
+            return res.status(401).json({
+                success: false,
+                error: 'Account is pending approval',
+                errorType: 'ACCOUNT_PENDING_APPROVAL'
+            });
+        }
+
+        // Validate password
+        const isMatch = await user.comparePassword(password);
+        if (!isMatch) {
+            await user.incLoginAttempts();
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid credentials',
+                errorType: 'INVALID_CREDENTIALS'
+            });
+        }
+
+        // Reset login attempts on successful login
+        await user.resetLoginAttempts();
+
+        // Generate tokens
+        const { accessToken, refreshToken } = generateTokens(user._id);
+
+        // Save refresh token
+        const refreshTokenExpiry = new Date();
+        refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 7);
+
+        user.refreshTokens.push({
+            token: refreshToken,
+            expiresAt: refreshTokenExpiry
         });
 
-        // Create notification for each approver
-        const notifications = approvers.map(approver => ({
-          title: 'New Customer Registration',
-          message: `New customer ${userData.fullName} (${userData.email}) has registered and requires approval.`,
-          category: 'user',
-          type: 'info',
-          priority: 'normal',
-          recipient: {
-            userId: approver._id,
-            specific: true
-          },
-          sender: {
-            system: true,
-            name: 'System'
-          },
-          data: {
-            customerId: user._id,
-            customerName: userData.fullName,
-            customerEmail: userData.email
-          }
-        }));
+        // Update last login
+        user.lastLogin = new Date();
+        await user.save();
 
-        if (notifications.length > 0) {
-          await Notification.insertMany(notifications);
+        // Clean up expired refresh tokens
+        user.refreshTokens = user.refreshTokens.filter(token => token.expiresAt > new Date());
+        await user.save();
+
+        logger.info(`User ${user.email} logged in successfully`);
+
+        res.json({
+            success: true,
+            message: 'Login successful',
+            accessToken,
+            refreshToken,
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                fullName: user.fullName,
+                role: user.role,
+                isActive: user.isActive,
+                isApproved: user.isApproved,
+                emailVerified: user.emailVerified,
+                profilePicture: user.profilePicture,
+                preferences: user.preferences,
+                lastLogin: user.lastLogin
+            }
+        });
+    } catch (error) {
+        logger.error('Login error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Login failed',
+            errorType: 'LOGIN_ERROR'
+        });
+    }
+});
+
+// Register endpoint
+router.post('/register', registerValidation, async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: errors.array()
+            });
         }
-      } catch (notificationError) {
-        console.error('Failed to create approval notifications:', notificationError);
-        // Don't fail the registration if notification creation fails
-      }
+
+        const { username, email, password, fullName, phone, role = 'customer' } = req.body;
+
+        // Check if user already exists
+        const existingUser = await User.findByEmailOrUsername(email);
+        if (existingUser) {
+            return res.status(409).json({
+                success: false,
+                error: 'User already exists',
+                errorType: 'USER_EXISTS'
+            });
+        }
+
+        // Check if username is taken
+        const existingUsername = await User.findOne({ username });
+        if (existingUsername) {
+            return res.status(409).json({
+                success: false,
+                error: 'Username already taken',
+                errorType: 'USERNAME_TAKEN'
+            });
+        }
+
+        // Create new user
+        const user = new User({
+            username,
+            email,
+            password,
+            fullName,
+            phone,
+            role,
+            isApproved: role === 'customer' ? true : false, // Auto-approve customers
+            emailVerified: false
+        });
+
+        // Generate email verification token
+        const verificationToken = user.generateEmailVerificationToken();
+        await user.save();
+
+        // Send verification email
+        try {
+            await sendEmail({
+                to: user.email,
+                subject: 'Verify your email address',
+                template: 'email-verification',
+                data: {
+                    fullName: user.fullName,
+                    verificationToken,
+                    verificationUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`
+                }
+            });
+        } catch (emailError) {
+            logger.error('Email verification sending failed:', emailError);
+        }
+
+        logger.info(`New user registered: ${user.email}`);
+
+        res.status(201).json({
+            success: true,
+            message: 'Registration successful. Please check your email to verify your account.',
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                fullName: user.fullName,
+                role: user.role,
+                isActive: user.isActive,
+                isApproved: user.isApproved,
+                emailVerified: user.emailVerified
+            }
+        });
+    } catch (error) {
+        logger.error('Registration error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Registration failed',
+            errorType: 'REGISTRATION_ERROR'
+        });
     }
-    
-    // Remove sensitive data
-    const userResponse = user.toJSON();
-    
-    res.status(201).json({
-      success: true,
-      message: userData.isApproved ? 'User registered successfully' : 'User registered successfully. Awaiting approval.',
-      user: userResponse,
-      requiresApproval: !userData.isApproved
-    });
-    
-  } catch (error) {
-    console.error('Registration error:', error);
-    
-    if (error.code === 11000) {
-      // Duplicate key error
-      const field = Object.keys(error.keyPattern)[0];
-      return res.status(409).json({
-        success: false,
-        error: `${field} already exists`,
-        errorType: 'DUPLICATE_KEY'
-      });
-    }
-    
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({
-        success: false,
-        error: Object.values(error.errors).map(e => e.message).join(', '),
-        errorType: 'VALIDATION_ERROR'
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: 'Registration failed',
-      errorType: 'REGISTRATION_ERROR'
-    });
-  }
 });
 
-// Login user
-router.post('/login', authRateLimit(5, 15 * 60 * 1000), async (req, res) => {
-  try {
-    const { email, identifier, password } = req.body;
-    
-    // Support both 'email' and 'identifier' field names for flexibility
-    const loginIdentifier = identifier || email;
-    
-    if (!loginIdentifier || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email/username and password are required',
-        errorType: 'VALIDATION_ERROR'
-      });
-    }
-    
-    // Find user by email or username
-    const user = await User.findOne({
-      $or: [
-        { email: loginIdentifier.toLowerCase() },
-        { username: loginIdentifier.toLowerCase() }
-      ]
-    });
-    
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid credentials',
-        errorType: 'INVALID_CREDENTIALS'
-      });
-    }
-    
-    // Check password
-    const isPasswordValid = await user.comparePassword(password);
-    
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid credentials',
-        errorType: 'INVALID_CREDENTIALS'
-      });
-    }
-    
-    // Check if user can login
-    if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        error: 'Account is deactivated',
-        errorType: 'ACCOUNT_DEACTIVATED'
-      });
-    }
-    
-    if (!user.isApproved) {
-      return res.status(401).json({
-        success: false,
-        error: 'Account pending approval',
-        errorType: 'ACCOUNT_PENDING_APPROVAL'
-      });
-    }
-    
-    if (!user.emailVerified && process.env.NODE_ENV !== 'development') {
-      return res.status(401).json({
-        success: false,
-        error: 'Email not verified',
-        errorType: 'EMAIL_NOT_VERIFIED'
-      });
-    }
-    
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user._id);
-    
-    // Store refresh token
-    const refreshTokenExpiry = new Date();
-    refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 7); // 7 days
-    
-    await user.addRefreshToken(refreshToken, refreshTokenExpiry);
-    await user.updateLastLogin();
-    
-    // Clean expired tokens
-    await user.cleanExpiredTokens();
-    
-    // Prepare user response
-    const userResponse = user.toJSON();
-    
-    res.json({
-      success: true,
-      message: 'Login successful',
-      user: userResponse,
-      accessToken,
-      refreshToken,
-      expiresIn: process.env.JWT_EXPIRES_IN || '24h'
-    });
-    
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Login failed',
-      errorType: 'LOGIN_ERROR'
-    });
-  }
-});
-
-// Refresh token
+// Refresh token endpoint
 router.post('/refresh-token', verifyRefreshToken, async (req, res) => {
-  try {
-    const user = req.user;
-    const oldRefreshToken = req.refreshToken;
-    
-    // Generate new tokens
-    const { accessToken, refreshToken } = generateTokens(user._id);
-    
-    // Remove old refresh token and add new one
-    await user.removeRefreshToken(oldRefreshToken);
-    
-    const refreshTokenExpiry = new Date();
-    refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 7);
-    
-    await user.addRefreshToken(refreshToken, refreshTokenExpiry);
-    
-    res.json({
-      success: true,
-      message: 'Token refreshed successfully',
-      accessToken,
-      refreshToken,
-      expiresIn: process.env.JWT_EXPIRES_IN || '24h'
-    });
-    
-  } catch (error) {
-    console.error('Token refresh error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Token refresh failed',
-      errorType: 'TOKEN_REFRESH_ERROR'
-    });
-  }
-});
-
-// Logout
-router.post('/logout', authenticateToken, async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
-    
-    if (refreshToken) {
-      await req.user.removeRefreshToken(refreshToken);
-    }
-    
-    res.json({
-      success: true,
-      message: 'Logged out successfully'
-    });
-    
-  } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Logout failed',
-      errorType: 'LOGOUT_ERROR'
-    });
-  }
-});
-
-// Get current user
-router.get('/me', authenticateToken, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id)
-      .select('-password -refreshTokens')
-      .populate('approvedBy', 'fullName username');
-    
-    res.json({
-      success: true,
-      user: user.toJSON()
-    });
-    
-  } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to get user information',
-      errorType: 'GET_USER_ERROR'
-    });
-  }
-});
-
-// Update user profile
-router.put('/me', authenticateToken, async (req, res) => {
-  try {
-    const allowedUpdates = ['fullName', 'phone', 'address', 'preferences'];
-    const updates = {};
-    
-    // Filter allowed updates
-    Object.keys(req.body).forEach(key => {
-      if (allowedUpdates.includes(key)) {
-        updates[key] = req.body[key];
-      }
-    });
-    
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'No valid updates provided',
-        errorType: 'NO_UPDATES'
-      });
-    }
-    
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      updates,
-      { new: true, runValidators: true }
-    ).select('-password -refreshTokens');
-    
-    res.json({
-      success: true,
-      message: 'Profile updated successfully',
-      user: user.toJSON()
-    });
-    
-  } catch (error) {
-    console.error('Profile update error:', error);
-    
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({
-        success: false,
-        error: Object.values(error.errors).map(e => e.message).join(', '),
-        errorType: 'VALIDATION_ERROR'
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: 'Profile update failed',
-      errorType: 'PROFILE_UPDATE_ERROR'
-    });
-  }
-});
-
-// Change password
-router.put('/change-password', authenticateToken, async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        error: 'Current password and new password are required',
-        errorType: 'VALIDATION_ERROR'
-      });
-    }
-    
-    if (newPassword.length < 6) {
-      return res.status(400).json({
-        success: false,
-        error: 'New password must be at least 6 characters long',
-        errorType: 'VALIDATION_ERROR'
-      });
-    }
-    
-    const user = await User.findById(req.user._id);
-    
-    // Verify current password
-    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
-    
-    if (!isCurrentPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        error: 'Current password is incorrect',
-        errorType: 'INVALID_PASSWORD'
-      });
-    }
-    
-    // Update password
-    user.password = newPassword;
-    await user.save();
-    
-    // Clear all refresh tokens to force re-login
-    user.refreshTokens = [];
-    await user.save();
-    
-    res.json({
-      success: true,
-      message: 'Password changed successfully. Please login again.'
-    });
-    
-  } catch (error) {
-    console.error('Password change error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Password change failed',
-      errorType: 'PASSWORD_CHANGE_ERROR'
-    });
-  }
-});
-
-// Get pending users (admin and cashier only)
-router.get('/pending-users', authenticateToken, async (req, res) => {
-  try {
-    if (!['admin', 'cashier'].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        error: 'Admin or cashier access required',
-        errorType: 'ACCESS_DENIED'
-      });
-    }
-    
-    const pendingUsers = await User.find({
-      isApproved: false,
-      isActive: true
-    }).select('-password -refreshTokens').sort({ createdAt: -1 });
-    
-    res.json({
-      success: true,
-      users: pendingUsers
-    });
-    
-  } catch (error) {
-    console.error('Get pending users error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to get pending users',
-      errorType: 'GET_PENDING_USERS_ERROR'
-    });
-  }
-});
-
-// Approve user (admin and cashier only)
-router.post('/approve-user', authenticateToken, async (req, res) => {
-  try {
-    if (!['admin', 'cashier'].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        error: 'Admin or cashier access required',
-        errorType: 'ACCESS_DENIED'
-      });
-    }
-    
-    const { userId } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'User ID is required',
-        errorType: 'VALIDATION_ERROR'
-      });
-    }
-    
-    const user = await User.findByIdAndUpdate(
-      userId,
-      {
-        isApproved: true,
-        emailVerified: true,
-        approvedBy: req.user._id,
-        approvedAt: new Date()
-      },
-      { new: true }
-    ).select('-password -refreshTokens');
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found',
-        errorType: 'USER_NOT_FOUND'
-      });
-    }
-
-    // Create approval notification for the user
     try {
-      await new Notification({
-        title: 'Account Approved',
-        message: `Your account has been approved by ${req.user.fullName || req.user.username}. You can now log in to access all features.`,
-        category: 'system',
-        type: 'success',
-        priority: 'high',
-        recipient: {
-          userId: user._id,
-          specific: true
-        },
-        sender: {
-          userId: req.user._id,
-          system: false,
-          name: req.user.fullName || req.user.username
-        },
-        data: {
-          approvedBy: req.user._id,
-          approverName: req.user.fullName || req.user.username,
-          approvedAt: new Date()
-        }
-      }).save();
-    } catch (notificationError) {
-      console.error('Failed to create approval notification:', notificationError);
-      // Don't fail the approval if notification creation fails
+        const { user, refreshToken } = req;
+
+        // Generate new tokens
+        const { accessToken, refreshToken: newRefreshToken } = generateTokens(user._id);
+
+        // Remove old refresh token and add new one
+        user.refreshTokens = user.refreshTokens.filter(token => token.token !== refreshToken);
+
+        const refreshTokenExpiry = new Date();
+        refreshTokenExpiry.setDate(refreshTokenExpiry.getDate() + 7);
+
+        user.refreshTokens.push({
+            token: newRefreshToken,
+            expiresAt: refreshTokenExpiry
+        });
+
+        await user.save();
+
+        res.json({
+            success: true,
+            accessToken,
+            refreshToken: newRefreshToken
+        });
+    } catch (error) {
+        logger.error('Token refresh error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Token refresh failed',
+            errorType: 'TOKEN_REFRESH_ERROR'
+        });
     }
-    
-    res.json({
-      success: true,
-      message: 'User approved successfully',
-      user: user.toJSON()
-    });
-    
-  } catch (error) {
-    console.error('User approval error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'User approval failed',
-      errorType: 'USER_APPROVAL_ERROR'
-    });
-  }
 });
 
-// Reject user (admin and cashier only)
-router.post('/reject-user', authenticateToken, async (req, res) => {
-  try {
-    if (!['admin', 'cashier'].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        error: 'Admin or cashier access required',
-        errorType: 'ACCESS_DENIED'
-      });
-    }
-    
-    const { userId, reason } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'User ID is required',
-        errorType: 'VALIDATION_ERROR'
-      });
-    }
-    
-    const user = await User.findByIdAndUpdate(
-      userId,
-      {
-        isActive: false,
-        rejectedAt: new Date(),
-        rejectionReason: reason
-      },
-      { new: true }
-    ).select('-password -refreshTokens');
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found',
-        errorType: 'USER_NOT_FOUND'
-      });
-    }
-
-    // Create rejection notification for the user
+// Logout endpoint
+router.post('/logout', async (req, res) => {
     try {
-      await new Notification({
-        title: 'Account Registration Rejected',
-        message: reason 
-          ? `Your account registration has been rejected by ${req.user.fullName || req.user.username}. Reason: ${reason}`
-          : `Your account registration has been rejected by ${req.user.fullName || req.user.username}. Please contact support for more information.`,
-        category: 'system',
-        type: 'error',
-        priority: 'high',
-        recipient: {
-          userId: user._id,
-          specific: true
-        },
-        sender: {
-          userId: req.user._id,
-          system: false,
-          name: req.user.fullName || req.user.username
-        },
-        data: {
-          rejectedBy: req.user._id,
-          rejectorName: req.user.fullName || req.user.username,
-          rejectedAt: new Date(),
-          reason: reason || 'No reason provided'
+        const { refreshToken } = req.body;
+
+        if (refreshToken) {
+            // Find user and remove refresh token
+            const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+            const user = await User.findById(decoded.userId);
+
+            if (user) {
+                user.refreshTokens = user.refreshTokens.filter(token => token.token !== refreshToken);
+                await user.save();
+            }
         }
-      }).save();
-    } catch (notificationError) {
-      console.error('Failed to create rejection notification:', notificationError);
-      // Don't fail the rejection if notification creation fails
+
+        res.json({
+            success: true,
+            message: 'Logout successful'
+        });
+    } catch (error) {
+        logger.error('Logout error:', error);
+        res.json({
+            success: true,
+            message: 'Logout successful'
+        });
     }
-    
-    res.json({
-      success: true,
-      message: 'User rejected successfully',
-      user: user.toJSON()
-    });
-    
-  } catch (error) {
-    console.error('User rejection error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'User rejection failed',
-      errorType: 'USER_REJECTION_ERROR'
-    });
-  }
 });
 
-module.exports = router;
+// Get current user endpoint
+router.get('/me', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                error: 'Access token required',
+                errorType: 'MISSING_TOKEN'
+            });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.userId).select('-password -refreshTokens');
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not found',
+                errorType: 'USER_NOT_FOUND'
+            });
+        }
+
+        res.json({
+            success: true,
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                fullName: user.fullName,
+                role: user.role,
+                isActive: user.isActive,
+                isApproved: user.isApproved,
+                emailVerified: user.emailVerified,
+                profilePicture: user.profilePicture,
+                preferences: user.preferences,
+                lastLogin: user.lastLogin,
+                createdAt: user.createdAt
+            }
+        });
+    } catch (error) {
+        logger.error('Get current user error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get user information',
+            errorType: 'GET_USER_ERROR'
+        });
+    }
+});
+
+// Forgot password endpoint
+router.post('/forgot-password', [
+    body('email').isEmail().normalizeEmail()
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: errors.array()
+            });
+        }
+
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            return res.json({
+                success: true,
+                message: 'If a user with that email exists, a password reset link has been sent.'
+            });
+        }
+
+        // Generate reset token
+        const resetToken = user.generatePasswordResetToken();
+        await user.save();
+
+        // Send reset email
+        try {
+            await sendEmail({
+                to: user.email,
+                subject: 'Password Reset Request',
+                template: 'password-reset',
+                data: {
+                    fullName: user.fullName,
+                    resetToken,
+                    resetUrl: `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`
+                }
+            });
+        } catch (emailError) {
+            logger.error('Password reset email sending failed:', emailError);
+        }
+
+        res.json({
+            success: true,
+            message: 'If a user with that email exists, a password reset link has been sent.'
+        });
+    } catch (error) {
+        logger.error('Forgot password error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to process password reset request',
+            errorType: 'FORGOT_PASSWORD_ERROR'
+        });
+    }
+});
+
+// Reset password endpoint
+router.post('/reset-password', [
+    body('token').notEmpty(),
+    body('password').isLength({ min: 6 })
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: errors.array()
+            });
+        }
+
+        const { token, password } = req.body;
+
+        // Hash the token
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+        // Find user with valid reset token
+        const user = await User.findOne({
+            passwordResetToken: hashedToken,
+            passwordResetExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid or expired reset token',
+                errorType: 'INVALID_RESET_TOKEN'
+            });
+        }
+
+        // Update password
+        user.password = password;
+        user.passwordResetToken = undefined;
+        user.passwordResetExpires = undefined;
+        user.loginAttempts = 0;
+        user.lockUntil = undefined;
+
+        await user.save();
+
+        logger.info(`Password reset successful for user: ${user.email}`);
+
+        res.json({
+            success: true,
+            message: 'Password reset successful'
+        });
+    } catch (error) {
+        logger.error('Reset password error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to reset password',
+            errorType: 'RESET_PASSWORD_ERROR'
+        });
+    }
+});
+
+// Verify email endpoint
+router.post('/verify-email', [
+    body('token').notEmpty()
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: errors.array()
+            });
+        }
+
+        const { token } = req.body;
+
+        // Hash the token
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+        // Find user with valid verification token
+        const user = await User.findOne({
+            emailVerificationToken: hashedToken,
+            emailVerificationExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid or expired verification token',
+                errorType: 'INVALID_VERIFICATION_TOKEN'
+            });
+        }
+
+        // Verify email
+        user.emailVerified = true;
+        user.emailVerificationToken = undefined;
+        user.emailVerificationExpires = undefined;
+
+        await user.save();
+
+        logger.info(`Email verification successful for user: ${user.email}`);
+
+        res.json({
+            success: true,
+            message: 'Email verification successful'
+        });
+    } catch (error) {
+        logger.error('Email verification error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to verify email',
+            errorType: 'EMAIL_VERIFICATION_ERROR'
+        });
+    }
+});
+
+export default router;

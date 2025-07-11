@@ -1,233 +1,381 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const orderSchema = new mongoose.Schema({
-  orderNumber: {
-    type: String,
-    unique: true,
-    trim: true
-  },
-  customer: {
-    customerId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
+    orderNumber: {
+        type: String,
+        unique: true,
+        required: true
     },
-    name: {
-      type: String,
-      required: true,
-      trim: true
+    customer: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
     },
-    email: String,
-    phone: String,
-    address: {
-      street: String,
-      city: String,
-      district: String,
-      postalCode: String,
-      coordinates: {
-        latitude: Number,
-        longitude: Number
-      }
-    }
-  },
-  items: [{
-    materialId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Material',
-      required: true
+    items: [{
+        inventory: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Inventory',
+            required: true
+        },
+        quantity: {
+            type: Number,
+            required: true,
+            min: 1
+        },
+        unitPrice: {
+            type: Number,
+            required: true,
+            min: 0
+        },
+        totalPrice: {
+            type: Number,
+            required: true,
+            min: 0
+        },
+        notes: String
+    }],
+    status: {
+        type: String,
+        enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
+        default: 'pending'
     },
-    materialName: String,
-    materialSku: String,
-    quantity: {
-      type: Number,
-      required: true,
-      min: 1
+    priority: {
+        type: String,
+        enum: ['low', 'medium', 'high', 'urgent'],
+        default: 'medium'
     },
-    unit: String,
-    unitPrice: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-    totalPrice: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-    notes: String
-  }],
-  pricing: {
-    subtotal: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-    tax: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    deliveryCharges: {
-      type: Number,
-      default: 0,
-      min: 0
+    totalAmount: {
+        type: Number,
+        required: true,
+        min: 0
     },
     discount: {
-      type: Number,
-      default: 0,
-      min: 0
+        type: Number,
+        min: 0,
+        default: 0
     },
-    total: {
-      type: Number,
-      required: true,
-      min: 0
+    tax: {
+        type: Number,
+        min: 0,
+        default: 0
     },
-    currency: {
-      type: String,
-      default: 'LKR'
-    }
-  },
-  status: {
-    type: String,
-    enum: [
-      'pending',
-      'confirmed',
-      'processing',
-      'partially_scheduled',
-      'fully_scheduled',
-      'partially_dispatched',
-      'fully_dispatched',
-      'partially_delivered',
-      'completed',
-      'cancelled',
-      'refunded'
-    ],
-    default: 'pending'
-  },
-  priority: {
-    type: String,
-    enum: ['low', 'normal', 'high', 'urgent'],
-    default: 'normal'
-  },
-  deliveryPreferences: {
-    preferredDate: Date,
-    preferredTimeSlot: {
-      start: String,
-      end: String
+    finalAmount: {
+        type: Number,
+        required: true,
+        min: 0
     },
-    specialInstructions: String,
-    contactPerson: {
-      name: String,
-      phone: String
-    }
-  },
-  paymentInfo: {
-    method: {
-      type: String,
-      enum: ['cash', 'card', 'bank_transfer', 'credit'],
-      default: 'cash'
+    paymentStatus: {
+        type: String,
+        enum: ['pending', 'partial', 'paid', 'refunded', 'cancelled'],
+        default: 'pending'
     },
-    status: {
-      type: String,
-      enum: ['pending', 'partial', 'paid', 'refunded'],
-      default: 'pending'
+    paymentMethod: {
+        type: String,
+        enum: ['cash', 'card', 'bank_transfer', 'cheque', 'credit'],
+        default: 'cash'
     },
-    paidAmount: {
-      type: Number,
-      default: 0,
-      min: 0
+    shippingAddress: {
+        street: { type: String, required: true },
+        city: { type: String, required: true },
+        state: { type: String, required: true },
+        zipCode: { type: String, required: true },
+        country: { type: String, default: 'Sri Lanka' },
+        phone: String,
+        instructions: String
     },
-    dueAmount: {
-      type: Number,
-      default: 0,
-      min: 0
-    }
-  },
-  timeline: {
-    orderDate: {
-      type: Date,
-      default: Date.now
+    billingAddress: {
+        street: String,
+        city: String,
+        state: String,
+        zipCode: String,
+        country: { type: String, default: 'Sri Lanka' },
+        phone: String
     },
-    confirmedAt: Date,
-    scheduledAt: Date,
-    dispatchedAt: Date,
-    deliveredAt: Date,
-    cancelledAt: Date
-  },
-  notes: {
-    customerNotes: String,
+    delivery: {
+        method: {
+            type: String,
+            enum: ['pickup', 'delivery', 'courier'],
+            default: 'delivery'
+        },
+        estimatedDate: Date,
+        actualDate: Date,
+        driver: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        trackingNumber: String,
+        notes: String
+    },
+    approvedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    approvedAt: Date,
+    processedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    processedAt: Date,
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    updatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    notes: String,
     internalNotes: String,
-    deliveryNotes: String
-  },
-  assignedStaff: {
-    salesPerson: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    warehouseManager: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
+    attachments: [{
+        filename: String,
+        originalName: String,
+        url: String,
+        size: Number,
+        uploadedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        uploadedAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
+    statusHistory: [{
+        status: String,
+        timestamp: {
+            type: Date,
+            default: Date.now
+        },
+        updatedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        notes: String
+    }],
+    deletedAt: {
+        type: Date,
+        default: null
     }
-  },
-  trackingInfo: {
-    trackingNumber: String,
-    estimatedDelivery: Date,
-    actualDelivery: Date
-  }
 }, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
-
-// Virtual for sub-orders
-orderSchema.virtual('subOrders', {
-  ref: 'SubOrder',
-  localField: '_id',
-  foreignField: 'parentOrderId'
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
 // Virtual for order age in days
-orderSchema.virtual('orderAge').get(function() {
-  return Math.floor((Date.now() - this.timeline.orderDate) / (1000 * 60 * 60 * 24));
+orderSchema.virtual('ageInDays').get(function () {
+    return Math.floor((Date.now() - this.createdAt) / (1000 * 60 * 60 * 24));
 });
 
-// Virtual for completion percentage
-orderSchema.virtual('completionPercentage').get(function() {
-  if (!this.subOrders || this.subOrders.length === 0) return 0;
-  
-  const deliveredSubOrders = this.subOrders.filter(sub => sub.status === 'delivered').length;
-  return Math.round((deliveredSubOrders / this.subOrders.length) * 100);
+// Virtual for total items count
+orderSchema.virtual('totalItems').get(function () {
+    return this.items.reduce((total, item) => total + item.quantity, 0);
 });
+
+// Virtual for order status display
+orderSchema.virtual('statusDisplay').get(function () {
+    return this.status.replace('_', ' ').toUpperCase();
+});
+
+// Index for performance
+orderSchema.index({ orderNumber: 1 });
+orderSchema.index({ customer: 1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ 'delivery.estimatedDate': 1 });
+orderSchema.index({ deletedAt: 1 });
 
 // Pre-save middleware to generate order number
-orderSchema.pre('save', async function(next) {
-  if (this.isNew && !this.orderNumber) {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    
-    // Find the last order number for today
-    const lastOrder = await this.constructor.findOne({
-      orderNumber: new RegExp(`^ORD-${year}${month}${day}-`)
-    }).sort({ orderNumber: -1 });
-    
-    let sequence = 1;
-    if (lastOrder) {
-      const lastSequence = parseInt(lastOrder.orderNumber.split('-')[2]);
-      sequence = lastSequence + 1;
+orderSchema.pre('save', async function (next) {
+    if (!this.orderNumber) {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+
+        // Count orders for today
+        const todayStart = new Date(year, today.getMonth(), today.getDate());
+        const todayEnd = new Date(year, today.getMonth(), today.getDate() + 1);
+
+        const todayOrderCount = await this.constructor.countDocuments({
+            createdAt: { $gte: todayStart, $lt: todayEnd },
+            deletedAt: null
+        });
+
+        const orderSequence = String(todayOrderCount + 1).padStart(4, '0');
+        this.orderNumber = `ORD-${year}${month}${day}-${orderSequence}`;
     }
-    
-    this.orderNumber = `ORD-${year}${month}${day}-${String(sequence).padStart(4, '0')}`;
-  }
-  next();
+
+    // Calculate final amount
+    this.finalAmount = this.totalAmount - this.discount + this.tax;
+
+    // Add status history entry
+    if (this.isModified('status')) {
+        this.statusHistory.push({
+            status: this.status,
+            timestamp: new Date(),
+            updatedBy: this.updatedBy,
+            notes: this.notes
+        });
+    }
+
+    next();
 });
 
-// Index for efficient queries
-orderSchema.index({ orderNumber: 1 });
-orderSchema.index({ 'customer.customerId': 1, status: 1 });
-orderSchema.index({ status: 1, 'timeline.orderDate': -1 });
-orderSchema.index({ 'timeline.orderDate': -1 });
+// Static method to get order statistics
+orderSchema.statics.getStatistics = async function () {
+    const stats = await this.aggregate([
+        { $match: { deletedAt: null } },
+        {
+            $group: {
+                _id: null,
+                totalOrders: { $sum: 1 },
+                pendingOrders: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+                processingOrders: { $sum: { $cond: [{ $eq: ['$status', 'processing'] }, 1, 0] } },
+                shippedOrders: { $sum: { $cond: [{ $eq: ['$status', 'shipped'] }, 1, 0] } },
+                deliveredOrders: { $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] } },
+                cancelledOrders: { $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] } },
+                totalRevenue: { $sum: '$finalAmount' },
+                averageOrderValue: { $avg: '$finalAmount' }
+            }
+        }
+    ]);
 
-module.exports = mongoose.model('Order', orderSchema);
+    // Get monthly revenue
+    const monthlyRevenue = await this.aggregate([
+        { $match: { deletedAt: null, status: { $in: ['delivered', 'shipped'] } } },
+        {
+            $group: {
+                _id: {
+                    year: { $year: '$createdAt' },
+                    month: { $month: '$createdAt' }
+                },
+                revenue: { $sum: '$finalAmount' },
+                orders: { $sum: 1 }
+            }
+        },
+        { $sort: { '_id.year': -1, '_id.month': -1 } },
+        { $limit: 12 }
+    ]);
+
+    const result = stats[0] || {
+        totalOrders: 0,
+        pendingOrders: 0,
+        processingOrders: 0,
+        shippedOrders: 0,
+        deliveredOrders: 0,
+        cancelledOrders: 0,
+        totalRevenue: 0,
+        averageOrderValue: 0
+    };
+
+    result.monthlyRevenue = monthlyRevenue;
+
+    return result;
+};
+
+// Static method to get orders by customer
+orderSchema.statics.getOrdersByCustomer = async function (customerId, options = {}) {
+    const { page = 1, limit = 10, status } = options;
+
+    const filter = {
+        customer: customerId,
+        deletedAt: null
+    };
+
+    if (status) {
+        filter.status = status;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [orders, total] = await Promise.all([
+        this.find(filter)
+            .populate('customer', 'fullName email phone')
+            .populate('items.inventory', 'name sku unit')
+            .populate('delivery.driver', 'fullName phone')
+            .populate('approvedBy', 'fullName')
+            .populate('processedBy', 'fullName')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit),
+        this.countDocuments(filter)
+    ]);
+
+    return {
+        orders,
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        hasNextPage: page < Math.ceil(total / limit),
+        hasPrevPage: page > 1
+    };
+};
+
+// Static method to search orders
+orderSchema.statics.searchOrders = async function (query, options = {}) {
+    const {
+        status,
+        customer,
+        startDate,
+        endDate,
+        page = 1,
+        limit = 10,
+        sort = '-createdAt'
+    } = options;
+
+    const filter = {
+        deletedAt: null
+    };
+
+    if (query) {
+        filter.$or = [
+            { orderNumber: { $regex: query, $options: 'i' } },
+            { notes: { $regex: query, $options: 'i' } },
+            { 'delivery.trackingNumber': { $regex: query, $options: 'i' } }
+        ];
+    }
+
+    if (status) {
+        filter.status = status;
+    }
+
+    if (customer) {
+        filter.customer = customer;
+    }
+
+    if (startDate && endDate) {
+        filter.createdAt = {
+            $gte: new Date(startDate),
+            $lte: new Date(endDate)
+        };
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [orders, total] = await Promise.all([
+        this.find(filter)
+            .populate('customer', 'fullName email phone')
+            .populate('items.inventory', 'name sku unit')
+            .populate('delivery.driver', 'fullName phone')
+            .populate('approvedBy', 'fullName')
+            .populate('processedBy', 'fullName')
+            .sort(sort)
+            .skip(skip)
+            .limit(limit),
+        this.countDocuments(filter)
+    ]);
+
+    return {
+        orders,
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        hasNextPage: page < Math.ceil(total / limit),
+        hasPrevPage: page > 1
+    };
+};
+
+const Order = mongoose.model('Order', orderSchema);
+
+export default Order;

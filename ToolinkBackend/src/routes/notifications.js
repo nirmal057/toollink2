@@ -307,4 +307,31 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// Get unread notifications count
+router.get('/unread-count', async (req, res) => {
+    try {
+        const userNotifications = mockNotifications.filter(n =>
+            n.userId === null || n.userId === req.user._id.toString()
+        );
+
+        const unreadCount = userNotifications.filter(n => !n.read).length;
+
+        logger.info(`Unread notifications count: ${unreadCount} for user ${req.user._id}`);
+
+        res.json({
+            success: true,
+            data: {
+                count: unreadCount
+            }
+        });
+    } catch (error) {
+        logger.error('Get unread count error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch unread count',
+            errorType: 'FETCH_UNREAD_COUNT_ERROR'
+        });
+    }
+});
+
 export default router;

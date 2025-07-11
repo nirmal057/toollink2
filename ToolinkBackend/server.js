@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 // Import routes
 import authRoutes from './src/routes/auth.js';
 import userRoutes from './src/routes/users.js';
+import usersNewRoutes from './src/routes/usersNew.js';
 import inventoryRoutes from './src/routes/inventory.js';
 import orderRoutes from './src/routes/orders.js';
 import deliveryRoutes from './src/routes/delivery.js';
@@ -41,7 +42,7 @@ const __dirname = path.dirname(__filename);
 config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 // Security middleware
 app.use(helmet({
@@ -55,10 +56,10 @@ app.use(helmet({
     },
 }));
 
-// Rate limiting
+// Rate limiting - temporarily increased for development
 const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) || 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX) || 100, // limit each IP to 100 requests per windowMs
+    max: parseInt(process.env.RATE_LIMIT_MAX) || 1000, // increased to 1000 requests per windowMs
     message: 'Too many requests from this IP, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
@@ -68,6 +69,9 @@ app.use(limiter);
 
 // CORS configuration
 app.use(cors(corsOptions));
+
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
 
 // Compression middleware
 app.use(compression());
@@ -97,6 +101,7 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', authenticateToken, userRoutes);
+app.use('/api/users-new', usersNewRoutes);  // New users endpoint without auth for testing
 app.use('/api/inventory', authenticateToken, inventoryRoutes);
 app.use('/api/orders', authenticateToken, orderRoutes);
 app.use('/api/delivery', authenticateToken, deliveryRoutes);

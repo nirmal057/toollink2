@@ -51,120 +51,102 @@ app.use(helmet({
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
             scriptSrc: ["'self'"],
-            objectSrc: ["'none'"],
-            upgradeInsecureRequests: [],
+            imgSrc: ["'self'", "data:", "https:"],
         },
     },
 }));
 
-// Rate limiting
+// Rate limiting - temporarily increased for development
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) || 15 * 60 * 1000, // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX) || 1000, // increased to 1000 requests per windowMs
     message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
 });
+
 app.use(limiter);
-
-// Compression
-app.use(compression());
-
-// Request logging
-app.use(requestLogger);
 
 // CORS configuration
 app.use(cors(corsOptions));
 
-// Handle preflight requests
+// Handle preflight requests explicitly
 app.options('*', cors(corsOptions));
 
+// Compression middleware
+app.use(compression());
+
+// Request logging
+app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
+app.use(requestLogger);
+
 // Body parsing middleware
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static files
+// Serve static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// API Documentation route
-app.get('/api/docs', (req, res) => {
-    res.json({
-        message: 'ToolLink API Documentation',
-        version: '1.0.0',
-        endpoints: {
-            auth: '/api/auth',
-            users: '/api/users',
-            inventory: '/api/inventory',
-            orders: '/api/orders',
-            delivery: '/api/delivery',
-            notifications: '/api/notifications',
-            reports: '/api/reports',
-            feedback: '/api/feedback',
-            activity: '/api/activity',
-            admin: '/api/admin',
-            predictions: '/api/predictions'
-        }
-    });
-});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({
-        status: 'healthy',
+        status: 'OK',
         timestamp: new Date().toISOString(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV,
+        version: process.env.npm_package_version || '1.0.0'
     });
 });
 
-// Routes
+// API routes
 app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/users-new', usersNewRoutes);
-app.use('/api/inventory', inventoryRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/delivery', deliveryRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/feedback', feedbackRoutes);
-app.use('/api/activity', activityRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/predictions', predictionRoutes);
+app.use('/api/users', authenticateToken, userRoutes);
+app.use('/api/users-new', usersNewRoutes);  // New users endpoint without auth for testing
+app.use('/api/inventory', authenticateToken, inventoryRoutes);
+app.use('/api/orders', authenticateToken, orderRoutes);
+app.use('/api/delivery', authenticateToken, deliveryRoutes);
+app.use('/api/notifications', authenticateToken, notificationRoutes);
+app.use('/api/reports', authenticateToken, reportRoutes);
+app.use('/api/feedback', authenticateToken, feedbackRoutes);
+app.use('/api/activity', authenticateToken, activityRoutes);
+app.use('/api/admin', authenticateToken, adminRoutes);
+app.use('/api/predictions', authenticateToken, predictionRoutes);
 
-// Error handling middleware (must be last)
+// Error handling middleware
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-})
-    .then(async () => {
+// Database connection
+const connectToDatabase = async () => {
+    try {
+        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/toollink', {
+            useNewUrlParser: true,
+            useUnifiedTopology: true,
+        });
         logger.info('Connected to MongoDB Atlas successfully');
-        
+
         // Create default admin user
         await createDefaultAdmin();
-        
-        // Start server
-        app.listen(PORT, () => {
-            logger.info(`Server running on port ${PORT}`);
-            logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-            logger.info(`API Documentation: http://localhost:${PORT}/api/docs`);
+    } catch (error) {
+        logger.error('MongoDB connection failed:', {
+            message: error.message,
+            name: error.name,
+            code: error.code,
+            codeName: error.codeName
         });
-    })
-    .catch((error) => {
-        logger.error('MongoDB connection error:', error);
-        process.exit(1);
-    });
+        logger.warn('Server will continue without database connection');
+        logger.info('Make sure your IP is whitelisted in MongoDB Atlas and credentials are correct');
+    }
+};
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
-    logger.error('Unhandled Rejection at:', promise, 'reason:', err);
-    process.exit(1);
-});
+// Connect to database
+connectToDatabase();
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-    logger.error('Uncaught Exception thrown:', err);
-    process.exit(1);
+// Start server regardless of database connection
+app.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT}`);
+    logger.info(`Environment: ${process.env.NODE_ENV}`);
+    logger.info(`API Documentation: http://localhost:${PORT}/api/docs`);
 });
 
 // Graceful shutdown
@@ -184,4 +166,3 @@ process.on('SIGINT', () => {
     });
 });
 
-export default app;

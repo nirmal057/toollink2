@@ -139,10 +139,10 @@ mongoose.connect(process.env.MONGODB_URI, {
 })
     .then(async () => {
         logger.info('Connected to MongoDB Atlas successfully');
-        
+
         // Create default admin user
         await createDefaultAdmin();
-        
+
         // Start server
         app.listen(PORT, () => {
             logger.info(`Server running on port ${PORT}`);

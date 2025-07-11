@@ -1,329 +1,307 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const inventorySchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true,
-    index: true
-  },
-  description: {
-    type: String,
-    trim: true
-  },
-  category: {
-    type: String,
-    required: true,
-    enum: ['Tools', 'Hardware', 'Electrical', 'Plumbing', 'Safety', 'Building Materials', 'Fasteners', 'Automotive', 'Other'],
-    index: true
-  },
-  subcategory: {
-    type: String,
-    trim: true
-  },
-  sku: {
-    type: String,
-    required: true,
-    unique: true,
-    uppercase: true,
-    index: true
-  },
-  barcode: {
-    type: String,
-    unique: true,
-    sparse: true
-  },
-  brand: {
-    type: String,
-    trim: true
-  },
-  model: {
-    type: String,
-    trim: true
-  },
-  specifications: {
-    dimensions: {
-      length: Number,
-      width: Number,
-      height: Number,
-      unit: { type: String, enum: ['mm', 'cm', 'in', 'ft'], default: 'mm' }
+    name: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 100
     },
-    weight: {
-      value: Number,
-      unit: { type: String, enum: ['g', 'kg', 'lb', 'oz'], default: 'kg' }
+    description: {
+        type: String,
+        trim: true,
+        maxlength: 500
     },
-    material: String,
-    color: String,
-    finish: String,
-    grade: String,
-    other: mongoose.Schema.Types.Mixed
-  },
-  pricing: {
-    costPrice: {
-      type: Number,
-      required: true,
-      min: 0
+    category: {
+        type: String,
+        required: true,
+        trim: true,
+        enum: ['Tools', 'Hardware', 'Materials', 'Equipment', 'Safety', 'Electrical', 'Plumbing', 'Other']
     },
-    sellingPrice: {
-      type: Number,
-      required: true,
-      min: 0
+    sku: {
+        type: String,
+        unique: true,
+        trim: true,
+        uppercase: true
     },
-    wholesalePrice: {
-      type: Number,
-      min: 0
+    quantity: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0
     },
-    discountPrice: {
-      type: Number,
-      min: 0
-    },
-    currency: {
-      type: String,
-      default: 'USD'
-    }
-  },
-  stock: {
-    currentQuantity: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 0
-    },
-    minimumQuantity: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 10
-    },
-    maximumQuantity: {
-      type: Number,
-      min: 0
-    },
-    reorderLevel: {
-      type: Number,
-      min: 0
-    },
-    reorderQuantity: {
-      type: Number,
-      min: 0
+    current_stock: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0
     },
     unit: {
-      type: String,
-      required: true,
-      enum: ['piece', 'kg', 'lb', 'meter', 'feet', 'liter', 'gallon', 'box', 'pack', 'roll', 'sheet'],
-      default: 'piece'
-    }
-  },
-  location: {
-    warehouse: {
-      type: String,
-      required: true,
-      default: 'Main Warehouse'
+        type: String,
+        required: true,
+        trim: true,
+        enum: ['pieces', 'kg', 'liters', 'meters', 'boxes', 'sets', 'pairs', 'rolls', 'sheets', 'units']
     },
-    zone: String,
-    aisle: String,
-    shelf: String,
-    bin: String,
-    coordinates: {
-      x: Number,
-      y: Number,
-      z: Number
+    threshold: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 10
+    },
+    min_stock_level: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 10
+    },
+    max_stock_level: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 1000
+    },
+    location: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    supplier_info: {
+        name: { type: String, trim: true },
+        contact: { type: String, trim: true },
+        email: { type: String, trim: true },
+        phone: { type: String, trim: true },
+        address: { type: String, trim: true }
+    },
+    cost: {
+        type: Number,
+        min: 0,
+        default: 0
+    },
+    selling_price: {
+        type: Number,
+        min: 0,
+        default: 0
+    },
+    status: {
+        type: String,
+        enum: ['active', 'inactive', 'discontinued'],
+        default: 'active'
+    },
+    low_stock_alert: {
+        type: Boolean,
+        default: true
+    },
+    barcode: {
+        type: String,
+        trim: true
+    },
+    weight: {
+        type: Number,
+        min: 0
+    },
+    dimensions: {
+        length: { type: Number, min: 0 },
+        width: { type: Number, min: 0 },
+        height: { type: Number, min: 0 },
+        unit: { type: String, default: 'cm' }
+    },
+    images: [{
+        url: { type: String, trim: true },
+        alt: { type: String, trim: true },
+        isPrimary: { type: Boolean, default: false }
+    }],
+    tags: [{
+        type: String,
+        trim: true,
+        lowercase: true
+    }],
+    created_by: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
+    updated_by: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    deletedAt: {
+        type: Date,
+        default: null
+    },
+    notes: {
+        type: String,
+        maxlength: 500
     }
-  },
-  supplier: {
-    name: String,
-    contactPerson: String,
-    email: String,
-    phone: String,
-    address: String,
-    leadTime: Number, // in days
-    minimumOrderQuantity: Number
-  },
-  images: [{
-    url: String,
-    alt: String,
-    isPrimary: { type: Boolean, default: false }
-  }],
-  documents: [{
-    name: String,
-    url: String,
-    type: { type: String, enum: ['manual', 'datasheet', 'certificate', 'warranty', 'other'] }
-  }],
-  tags: [String],
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  isDiscontinued: {
-    type: Boolean,
-    default: false
-  },
-  qualityRating: {
-    type: Number,
-    min: 1,
-    max: 5,
-    default: 5
-  },
-  popularityScore: {
-    type: Number,
-    default: 0
-  },
-  seasonality: {
-    type: String,
-    enum: ['Year-round', 'Spring', 'Summer', 'Fall', 'Winter', 'Holiday'],
-    default: 'Year-round'
-  },
-  hazardous: {
-    isHazardous: { type: Boolean, default: false },
-    hazardClass: String,
-    storageRequirements: String,
-    handlingInstructions: String
-  },
-  maintenance: {
-    lastInspection: Date,
-    nextInspection: Date,
-    inspectionFrequency: Number, // in days
-    condition: { type: String, enum: ['Excellent', 'Good', 'Fair', 'Poor'], default: 'Good' }
-  },
-  analytics: {
-    totalSold: { type: Number, default: 0 },
-    totalRevenue: { type: Number, default: 0 },
-    averageOrderQuantity: { type: Number, default: 0 },
-    lastSold: Date,
-    topCustomers: [{
-      customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      quantity: Number,
-      revenue: Number
-    }]
-  },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  updatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }
 }, {
-  timestamps: true
+    timestamps: {
+        createdAt: 'created_at',
+        updatedAt: 'updated_at'
+    },
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
-// Compound indexes for better query performance
-inventorySchema.index({ category: 1, subcategory: 1 });
-inventorySchema.index({ 'stock.currentQuantity': 1, 'stock.minimumQuantity': 1 });
-inventorySchema.index({ 'location.warehouse': 1, 'location.zone': 1 });
-inventorySchema.index({ isActive: 1, isDiscontinued: 1 });
-inventorySchema.index({ name: 'text', description: 'text', tags: 'text' });
+// Virtual for checking if item is low stock
+inventorySchema.virtual('isLowStock').get(function () {
+    return this.current_stock <= this.min_stock_level;
+});
 
 // Virtual for stock status
-inventorySchema.virtual('stockStatus').get(function() {
-  if (this.stock.currentQuantity <= 0) return 'Out of Stock';
-  if (this.stock.currentQuantity <= this.stock.minimumQuantity) return 'Low Stock';
-  if (this.stock.reorderLevel && this.stock.currentQuantity <= this.stock.reorderLevel) return 'Reorder Required';
-  return 'In Stock';
+inventorySchema.virtual('stockStatus').get(function () {
+    if (this.current_stock === 0) return 'out_of_stock';
+    if (this.current_stock <= this.min_stock_level) return 'low_stock';
+    if (this.current_stock >= this.max_stock_level) return 'overstocked';
+    return 'in_stock';
 });
 
-// Virtual for profit margin
-inventorySchema.virtual('profitMargin').get(function() {
-  if (this.pricing.costPrice > 0) {
-    return ((this.pricing.sellingPrice - this.pricing.costPrice) / this.pricing.costPrice * 100).toFixed(2);
-  }
-  return 0;
+// Virtual for stock percentage
+inventorySchema.virtual('stockPercentage').get(function () {
+    if (this.max_stock_level === 0) return 0;
+    return Math.round((this.current_stock / this.max_stock_level) * 100);
 });
 
-// Virtual for full location
-inventorySchema.virtual('fullLocation').get(function() {
-  const parts = [
-    this.location.warehouse,
-    this.location.zone,
-    this.location.aisle,
-    this.location.shelf,
-    this.location.bin
-  ].filter(Boolean);
-  return parts.join(' - ');
+// Index for performance
+inventorySchema.index({ name: 1 });
+inventorySchema.index({ category: 1 });
+inventorySchema.index({ sku: 1 });
+inventorySchema.index({ status: 1 });
+inventorySchema.index({ current_stock: 1 });
+inventorySchema.index({ min_stock_level: 1 });
+inventorySchema.index({ created_at: -1 });
+inventorySchema.index({ deletedAt: 1 });
+
+// Pre-save middleware to generate SKU if not provided
+inventorySchema.pre('save', function (next) {
+    if (!this.sku) {
+        // Generate SKU from category and name
+        const categoryCode = this.category.substring(0, 3).toUpperCase();
+        const nameCode = this.name.replace(/\s+/g, '').substring(0, 3).toUpperCase();
+        const timestamp = Date.now().toString().slice(-4);
+        this.sku = `${categoryCode}${nameCode}${timestamp}`;
+    }
+
+    // Sync quantity with current_stock
+    if (this.isModified('quantity')) {
+        this.current_stock = this.quantity;
+    }
+
+    next();
 });
 
-// Pre-save middleware
-inventorySchema.pre('save', function(next) {
-  // Ensure SKU is uppercase
-  if (this.sku) {
-    this.sku = this.sku.toUpperCase();
-  }
-  
-  // Update analytics
-  if (this.isModified('stock.currentQuantity')) {
-    // Logic for updating analytics would go here
-  }
-  
-  next();
-});
+// Static method to get inventory statistics
+inventorySchema.statics.getStatistics = async function () {
+    const stats = await this.aggregate([
+        { $match: { deletedAt: null } },
+        {
+            $group: {
+                _id: null,
+                totalItems: { $sum: 1 },
+                activeItems: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
+                inactiveItems: { $sum: { $cond: [{ $eq: ['$status', 'inactive'] }, 1, 0] } },
+                lowStockItems: { $sum: { $cond: [{ $lte: ['$current_stock', '$min_stock_level'] }, 1, 0] } },
+                outOfStockItems: { $sum: { $cond: [{ $eq: ['$current_stock', 0] }, 1, 0] } },
+                totalValue: { $sum: { $multiply: ['$current_stock', '$cost'] } },
+                totalQuantity: { $sum: '$current_stock' }
+            }
+        }
+    ]);
 
-// Instance methods
-inventorySchema.methods.updateStock = function(quantity, operation, userId, reason) {
-  const stockHistory = {
-    operation, // 'add', 'remove', 'adjust'
-    quantity,
-    previousQuantity: this.stock.currentQuantity,
-    userId,
-    reason,
-    timestamp: new Date()
-  };
-  
-  switch (operation) {
-    case 'add':
-      this.stock.currentQuantity += quantity;
-      break;
-    case 'remove':
-      this.stock.currentQuantity = Math.max(0, this.stock.currentQuantity - quantity);
-      break;
-    case 'adjust':
-      this.stock.currentQuantity = quantity;
-      break;
-  }
-  
-  // Add to history (would need a separate StockHistory model)
-  // this.stockHistory.push(stockHistory);
-  
-  return this.save();
+    // Get category distribution
+    const categoryStats = await this.aggregate([
+        { $match: { deletedAt: null, status: 'active' } },
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+    ]);
+
+    const result = stats[0] || {
+        totalItems: 0,
+        activeItems: 0,
+        inactiveItems: 0,
+        lowStockItems: 0,
+        outOfStockItems: 0,
+        totalValue: 0,
+        totalQuantity: 0
+    };
+
+    result.categories = categoryStats.length;
+    result.categoryDistribution = categoryStats;
+
+    return result;
 };
 
-inventorySchema.methods.isLowStock = function() {
-  return this.stock.currentQuantity <= this.stock.minimumQuantity;
+// Static method to get low stock items
+inventorySchema.statics.getLowStockItems = async function () {
+    return await this.find({
+        deletedAt: null,
+        status: 'active',
+        $expr: { $lte: ['$current_stock', '$min_stock_level'] },
+        low_stock_alert: true
+    })
+        .populate('created_by', 'fullName email')
+        .populate('updated_by', 'fullName email')
+        .sort({ current_stock: 1 });
 };
 
-inventorySchema.methods.needsReorder = function() {
-  return this.stock.reorderLevel && this.stock.currentQuantity <= this.stock.reorderLevel;
+// Static method to search inventory
+inventorySchema.statics.searchInventory = async function (query, options = {}) {
+    const {
+        category,
+        status = 'active',
+        location,
+        lowStock = false,
+        page = 1,
+        limit = 10,
+        sort = 'name'
+    } = options;
+
+    const filter = {
+        deletedAt: null,
+        status
+    };
+
+    if (query) {
+        filter.$or = [
+            { name: { $regex: query, $options: 'i' } },
+            { description: { $regex: query, $options: 'i' } },
+            { sku: { $regex: query, $options: 'i' } },
+            { tags: { $in: [new RegExp(query, 'i')] } }
+        ];
+    }
+
+    if (category) {
+        filter.category = category;
+    }
+
+    if (location) {
+        filter.location = { $regex: location, $options: 'i' };
+    }
+
+    if (lowStock) {
+        filter.$expr = { $lte: ['$current_stock', '$min_stock_level'] };
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+        this.find(filter)
+            .populate('created_by', 'fullName email')
+            .populate('updated_by', 'fullName email')
+            .sort(sort)
+            .skip(skip)
+            .limit(limit),
+        this.countDocuments(filter)
+    ]);
+
+    return {
+        items,
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        hasNextPage: page < Math.ceil(total / limit),
+        hasPrevPage: page > 1
+    };
 };
 
-inventorySchema.methods.calculateReorderQuantity = function() {
-  if (this.stock.reorderQuantity) {
-    return this.stock.reorderQuantity;
-  }
-  // Default to bringing stock to maximum or 2x minimum
-  const target = this.stock.maximumQuantity || (this.stock.minimumQuantity * 2);
-  return Math.max(0, target - this.stock.currentQuantity);
-};
+const Inventory = mongoose.model('Inventory', inventorySchema);
 
-// Static methods
-inventorySchema.statics.findLowStock = function() {
-  return this.find({
-    $expr: { $lte: ['$stock.currentQuantity', '$stock.minimumQuantity'] },
-    isActive: true
-  });
-};
-
-inventorySchema.statics.findOutOfStock = function() {
-  return this.find({
-    'stock.currentQuantity': { $lte: 0 },
-    isActive: true
-  });
-};
-
-inventorySchema.statics.findByCategory = function(category, subcategory) {
-  const query = { category, isActive: true };
-  if (subcategory) query.subcategory = subcategory;
-  return this.find(query);
-};
-
-module.exports = mongoose.model('Inventory', inventorySchema);
+export default Inventory;

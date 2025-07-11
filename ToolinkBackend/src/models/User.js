@@ -1,177 +1,281 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
-  username: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    minlength: 3,
-    maxlength: 30
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
-  },
-  password: {
-    type: String,
-    required: true,
-    minlength: 6
-  },
-  fullName: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 100
-  },
-  phone: {
-    type: String,
-    trim: true,
-    match: [/^\+?[\d\s-()]{10,}$/, 'Please enter a valid phone number']
-  },
-  role: {
-    type: String,
-    enum: ['admin', 'user', 'warehouse', 'cashier', 'customer', 'driver', 'editor'],
-    default: 'customer'
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  isApproved: {
-    type: Boolean,
-    default: false
-  },
-  approvedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  approvedAt: {
-    type: Date
-  },
-  rejectedAt: {
-    type: Date
-  },
-  rejectionReason: {
-    type: String
-  },
-  profileImage: {
-    type: String
-  },
-  address: {
-    street: String,
-    city: String,
-    state: String,
-    zipCode: String,
-    country: { type: String, default: 'USA' }
-  },
-  preferences: {
-    emailNotifications: { type: Boolean, default: true },
-    smsNotifications: { type: Boolean, default: false },
-    theme: { type: String, enum: ['light', 'dark'], default: 'light' },
-    language: { type: String, default: 'en' }
-  },
-  lastLogin: {
-    type: Date
-  },
-  loginCount: {
-    type: Number,
-    default: 0
-  },
-  refreshTokens: [{
-    token: String,
-    createdAt: { type: Date, default: Date.now },
-    expiresAt: Date
-  }],
-  passwordResetToken: String,
-  passwordResetExpires: Date,
-  emailVerificationToken: String,
-  emailVerified: {
-    type: Boolean,
-    default: false
-  }
-}, {
-  timestamps: true,
-  toJSON: {
-    transform: function(doc, ret) {
-      delete ret.password;
-      delete ret.refreshTokens;
-      delete ret.passwordResetToken;
-      delete ret.emailVerificationToken;
-      return ret;
+    username: {
+        type: String,
+        required: true,
+        unique: true,
+        trim: true,
+        minlength: 3,
+        maxlength: 50
+    },
+    email: {
+        type: String,
+        required: true,
+        unique: true,
+        lowercase: true,
+        trim: true,
+        match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+    },
+    password: {
+        type: String,
+        required: true,
+        minlength: 6
+    },
+    fullName: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 100
+    },
+    phone: {
+        type: String,
+        trim: true,
+        match: [/^[\+]?[0-9\s\-\(\)]{10,}$/, 'Please enter a valid phone number']
+    },
+    role: {
+        type: String,
+        enum: ['admin', 'user', 'warehouse', 'cashier', 'customer', 'driver', 'editor'],
+        default: 'customer'
+    },
+    isActive: {
+        type: Boolean,
+        default: true
+    },
+    isApproved: {
+        type: Boolean,
+        default: false
+    },
+    emailVerified: {
+        type: Boolean,
+        default: false
+    },
+    profilePicture: {
+        type: String,
+        default: null
+    },
+    address: {
+        street: { type: String, trim: true },
+        city: { type: String, trim: true },
+        state: { type: String, trim: true },
+        zipCode: { type: String, trim: true },
+        country: { type: String, trim: true, default: 'Sri Lanka' }
+    },
+    preferences: {
+        notifications: { type: Boolean, default: true },
+        emailNotifications: { type: Boolean, default: true },
+        smsNotifications: { type: Boolean, default: false },
+        language: { type: String, default: 'en' },
+        theme: { type: String, enum: ['light', 'dark', 'system'], default: 'system' }
+    },
+    loginAttempts: {
+        type: Number,
+        default: 0
+    },
+    lockUntil: {
+        type: Date
+    },
+    lastLogin: {
+        type: Date
+    },
+    passwordResetToken: {
+        type: String
+    },
+    passwordResetExpires: {
+        type: Date
+    },
+    emailVerificationToken: {
+        type: String
+    },
+    emailVerificationExpires: {
+        type: Date
+    },
+    refreshTokens: [{
+        token: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now },
+        expiresAt: { type: Date, required: true }
+    }],
+    // Admin-specific fields
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    updatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    deletedAt: {
+        type: Date,
+        default: null
+    },
+    notes: {
+        type: String,
+        maxlength: 500
     }
-  }
+}, {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
-// Index for performance (email and username already indexed by unique: true)
+// Virtual for user's full profile
+userSchema.virtual('profile').get(function () {
+    return {
+        id: this._id,
+        username: this.username,
+        email: this.email,
+        fullName: this.fullName,
+        phone: this.phone,
+        role: this.role,
+        isActive: this.isActive,
+        isApproved: this.isApproved,
+        emailVerified: this.emailVerified,
+        profilePicture: this.profilePicture,
+        address: this.address,
+        preferences: this.preferences,
+        lastLogin: this.lastLogin,
+        createdAt: this.createdAt,
+        updatedAt: this.updatedAt
+    };
+});
+
+// Check if user is locked
+userSchema.virtual('isLocked').get(function () {
+    return !!(this.lockUntil && this.lockUntil > Date.now());
+});
+
+// Index for performance
+userSchema.index({ email: 1 });
+userSchema.index({ username: 1 });
 userSchema.index({ role: 1 });
-userSchema.index({ isActive: 1, isApproved: 1 });
+userSchema.index({ isActive: 1 });
+userSchema.index({ isApproved: 1 });
+userSchema.index({ createdAt: -1 });
 
-// Hash password before saving
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  try {
-    const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_ROUNDS) || 12);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
+// Pre-save middleware to hash password
+userSchema.pre('save', async function (next) {
+    if (!this.isModified('password')) return next();
+
+    try {
+        const salt = await bcrypt.genSalt(12);
+        this.password = await bcrypt.hash(this.password, salt);
+        next();
+    } catch (error) {
+        next(error);
+    }
 });
 
-// Compare password method
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+// Method to compare password
+userSchema.methods.comparePassword = async function (candidatePassword) {
+    return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Generate user display name
-userSchema.virtual('displayName').get(function() {
-  return this.fullName || this.username;
-});
+// Method to increment login attempts
+userSchema.methods.incLoginAttempts = async function () {
+    // If we have a previous lock that has expired, restart at 1
+    if (this.lockUntil && this.lockUntil < Date.now()) {
+        return await this.updateOne({
+            $unset: { lockUntil: 1 },
+            $set: { loginAttempts: 1 }
+        });
+    }
 
-// Check if user can login
-userSchema.methods.canLogin = function() {
-  return this.isActive && this.isApproved && this.emailVerified;
+    const updates = { $inc: { loginAttempts: 1 } };
+
+    // Lock account after 5 failed attempts
+    if (this.loginAttempts + 1 >= 5 && !this.isLocked) {
+        updates.$set = { lockUntil: Date.now() + 5 * 60 * 1000 }; // 5 minutes
+    }
+
+    return await this.updateOne(updates);
 };
 
-// Add refresh token
-userSchema.methods.addRefreshToken = function(token, expiresAt) {
-  this.refreshTokens.push({
-    token,
-    expiresAt
-  });
-  
-  // Keep only last 5 refresh tokens
-  if (this.refreshTokens.length > 5) {
-    this.refreshTokens = this.refreshTokens.slice(-5);
-  }
-  
-  return this.save();
+// Method to reset login attempts
+userSchema.methods.resetLoginAttempts = async function () {
+    return await this.updateOne({
+        $unset: { loginAttempts: 1, lockUntil: 1 }
+    });
 };
 
-// Remove refresh token
-userSchema.methods.removeRefreshToken = function(token) {
-  this.refreshTokens = this.refreshTokens.filter(rt => rt.token !== token);
-  return this.save();
+// Method to generate password reset token
+userSchema.methods.generatePasswordResetToken = function () {
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+
+    this.passwordResetToken = crypto.createHash('sha256').update(token).digest('hex');
+    this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    return token;
 };
 
-// Clean expired refresh tokens
-userSchema.methods.cleanExpiredTokens = function() {
-  const now = new Date();
-  this.refreshTokens = this.refreshTokens.filter(rt => rt.expiresAt > now);
-  return this.save();
+// Method to generate email verification token
+userSchema.methods.generateEmailVerificationToken = function () {
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+
+    this.emailVerificationToken = crypto.createHash('sha256').update(token).digest('hex');
+    this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+
+    return token;
 };
 
-// Update last login
-userSchema.methods.updateLastLogin = function() {
-  this.lastLogin = new Date();
-  this.loginCount += 1;
-  return this.save();
+// Static method to find user by email or username
+userSchema.statics.findByEmailOrUsername = function (identifier) {
+    return this.findOne({
+        $or: [
+            { email: identifier.toLowerCase() },
+            { username: identifier }
+        ]
+    });
 };
 
-module.exports = mongoose.model('User', userSchema);
+// Static method to get user statistics
+userSchema.statics.getStatistics = async function () {
+    const stats = await this.aggregate([
+        {
+            $group: {
+                _id: null,
+                totalUsers: { $sum: 1 },
+                activeUsers: { $sum: { $cond: [{ $eq: ['$isActive', true] }, 1, 0] } },
+                approvedUsers: { $sum: { $cond: [{ $eq: ['$isApproved', true] }, 1, 0] } },
+                verifiedUsers: { $sum: { $cond: [{ $eq: ['$emailVerified', true] }, 1, 0] } }
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                totalUsers: 1,
+                activeUsers: 1,
+                approvedUsers: 1,
+                verifiedUsers: 1,
+                inactiveUsers: { $subtract: ['$totalUsers', '$activeUsers'] },
+                pendingUsers: { $subtract: ['$totalUsers', '$approvedUsers'] },
+                unverifiedUsers: { $subtract: ['$totalUsers', '$verifiedUsers'] }
+            }
+        }
+    ]);
+
+    return stats[0] || {
+        totalUsers: 0,
+        activeUsers: 0,
+        approvedUsers: 0,
+        verifiedUsers: 0,
+        inactiveUsers: 0,
+        pendingUsers: 0,
+        unverifiedUsers: 0
+    };
+};
+
+// Static method to get role distribution
+userSchema.statics.getRoleDistribution = async function () {
+    return await this.aggregate([
+        { $match: { isActive: true } },
+        { $group: { _id: '$role', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+    ]);
+};
+
+const User = mongoose.model('User', userSchema);
+
+export default User;

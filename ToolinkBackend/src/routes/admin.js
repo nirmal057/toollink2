@@ -1,68 +1,248 @@
-const express = require('express');
-
-console.log('🔧 Loading admin routes...');
+import express from 'express';
+import { authorize } from '../middleware/auth.js';
+import User from '../models/User.js';
+import Order from '../models/Order.js';
+import Inventory from '../models/Inventory.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// Test route to verify admin routes are working (no auth required for testing)
-router.get('/test', (req, res) => {
-  console.log('📍 Admin test route hit');
-  res.json({ message: 'Admin routes are working!', timestamp: new Date().toISOString() });
-});
+// Get dashboard data
+router.get('/dashboard', authorize('admin'), async (req, res) => {
+    try {
+        const [userStats, orderStats, inventoryStats] = await Promise.all([
+            User.getStatistics(),
+            Order.getStatistics(),
+            Inventory.getStatistics()
+        ]);
 
-// Simple dashboard route without auth for testing
-router.get('/dashboard', (req, res) => {
-  console.log('📊 Admin dashboard route hit');
-  res.json({
-    success: true,
-    dashboard: {
-      userStats: {
-        total: 5,
-        active: 4,
-        pending: 1,
-        inactive: 0,
-        byRole: { admin: 1, customer: 3, cashier: 1 }
-      },
-      systemInfo: {
-        serverTime: new Date().toISOString(),
-        version: '1.0.0',
-        environment: 'development'
-      }
+        const dashboardData = {
+            users: userStats,
+            orders: orderStats,
+            inventory: inventoryStats,
+            systemInfo: {
+                uptime: process.uptime(),
+                nodeVersion: process.version,
+                platform: process.platform,
+                memoryUsage: process.memoryUsage(),
+                timestamp: new Date().toISOString()
+            }
+        };
+
+        res.json({
+            success: true,
+            data: dashboardData
+        });
+    } catch (error) {
+        logger.error('Get admin dashboard error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch dashboard data',
+            errorType: 'FETCH_DASHBOARD_ERROR'
+        });
     }
-  });
 });
 
-// Activity logs route
-router.get('/activities', (req, res) => {
-  console.log('📋 Admin activities route hit');
-  res.json({
-    success: true,
-    activities: [
-      {
-        id: 1,
-        type: 'user_login',
-        user: 'john.doe@example.com',
-        timestamp: new Date().toISOString(),
-        details: 'User logged in successfully'
-      },
-      {
-        id: 2,
-        type: 'order_created',
-        user: 'jane.smith@example.com',
-        timestamp: new Date(Date.now() - 300000).toISOString(),
-        details: 'Order #12345 created'
-      },
-      {
-        id: 3,
-        type: 'inventory_updated',
-        user: 'admin@example.com',
-        timestamp: new Date(Date.now() - 600000).toISOString(),
-        details: 'Product ABC123 stock updated'
-      }
-    ]
-  });
+// Get system audit logs
+router.get('/audit-logs', authorize('admin'), async (req, res) => {
+    try {
+        const { page = 1, limit = 50, action, userId, startDate, endDate } = req.query;
+
+        // Mock audit logs for now
+        const mockAuditLogs = [
+            {
+                id: '1',
+                action: 'user_created',
+                userId: req.user._id,
+                targetId: 'user123',
+                details: { email: 'newuser@example.com', role: 'customer' },
+                timestamp: new Date().toISOString(),
+                ip: '192.168.1.100'
+            },
+            {
+                id: '2',
+                action: 'inventory_updated',
+                userId: req.user._id,
+                targetId: 'inv456',
+                details: { name: 'Tool A', quantity: 50 },
+                timestamp: new Date().toISOString(),
+                ip: '192.168.1.100'
+            },
+            {
+                id: '3',
+                action: 'order_status_changed',
+                userId: req.user._id,
+                targetId: 'ord789',
+                details: { from: 'pending', to: 'confirmed' },
+                timestamp: new Date().toISOString(),
+                ip: '192.168.1.100'
+            }
+        ];
+
+        // Filter logs
+        let filteredLogs = mockAuditLogs;
+
+        if (action) {
+            filteredLogs = filteredLogs.filter(log => log.action === action);
+        }
+
+        if (userId) {
+            filteredLogs = filteredLogs.filter(log => log.userId === userId);
+        }
+
+        // Pagination
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const paginatedLogs = filteredLogs.slice(skip, skip + parseInt(limit));
+
+        res.json({
+            success: true,
+            data: paginatedLogs,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: filteredLogs.length,
+                pages: Math.ceil(filteredLogs.length / parseInt(limit))
+            }
+        });
+    } catch (error) {
+        logger.error('Get audit logs error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch audit logs',
+            errorType: 'FETCH_AUDIT_LOGS_ERROR'
+        });
+    }
 });
 
-console.log('✅ Admin routes loaded successfully');
+// Get system reports
+router.get('/reports', authorize('admin'), async (req, res) => {
+    try {
+        const { type = 'summary', startDate, endDate } = req.query;
 
-module.exports = router;
+        const reports = {
+            summary: {
+                users: await User.getStatistics(),
+                orders: await Order.getStatistics(),
+                inventory: await Inventory.getStatistics(),
+                generatedAt: new Date().toISOString()
+            },
+            users: {
+                total: await User.countDocuments({ deletedAt: null }),
+                byRole: await User.getRoleDistribution(),
+                activeUsers: await User.countDocuments({ isActive: true, deletedAt: null }),
+                verifiedUsers: await User.countDocuments({ emailVerified: true, deletedAt: null })
+            },
+            orders: {
+                total: await Order.countDocuments({ deletedAt: null }),
+                byStatus: await Order.aggregate([
+                    { $match: { deletedAt: null } },
+                    { $group: { _id: '$status', count: { $sum: 1 } } }
+                ]),
+                revenue: await Order.aggregate([
+                    { $match: { deletedAt: null, status: { $in: ['delivered', 'shipped'] } } },
+                    { $group: { _id: null, total: { $sum: '$finalAmount' } } }
+                ])
+            },
+            inventory: {
+                total: await Inventory.countDocuments({ deletedAt: null }),
+                byCategory: await Inventory.aggregate([
+                    { $match: { deletedAt: null } },
+                    { $group: { _id: '$category', count: { $sum: 1 } } }
+                ]),
+                lowStock: await Inventory.countDocuments({
+                    deletedAt: null,
+                    $expr: { $lte: ['$current_stock', '$min_stock_level'] }
+                })
+            }
+        };
+
+        res.json({
+            success: true,
+            data: reports[type] || reports.summary
+        });
+    } catch (error) {
+        logger.error('Get admin reports error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch reports',
+            errorType: 'FETCH_REPORTS_ERROR'
+        });
+    }
+});
+
+// Get system configuration
+router.get('/config', authorize('admin'), async (req, res) => {
+    try {
+        const config = {
+            system: {
+                name: 'ToolLink Management System',
+                version: '1.0.0',
+                environment: process.env.NODE_ENV,
+                uptime: process.uptime(),
+                nodeVersion: process.version
+            },
+            database: {
+                status: 'connected',
+                name: 'toollink'
+            },
+            features: {
+                emailNotifications: true,
+                fileUploads: true,
+                auditLogging: true,
+                multiRole: true
+            },
+            limits: {
+                maxFileSize: process.env.MAX_FILE_SIZE || '10MB',
+                maxUsers: 1000,
+                maxOrders: 10000,
+                maxInventoryItems: 5000
+            }
+        };
+
+        res.json({
+            success: true,
+            data: config
+        });
+    } catch (error) {
+        logger.error('Get admin config error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch configuration',
+            errorType: 'FETCH_CONFIG_ERROR'
+        });
+    }
+});
+
+// Update system configuration
+router.put('/config', authorize('admin'), async (req, res) => {
+    try {
+        const { features, limits } = req.body;
+
+        // In a real application, you would save this to a configuration collection
+        // For now, we'll just return the updated config
+
+        const updatedConfig = {
+            features,
+            limits,
+            updatedAt: new Date().toISOString(),
+            updatedBy: req.user._id
+        };
+
+        logger.info(`System configuration updated by ${req.user.fullName}`);
+
+        res.json({
+            success: true,
+            message: 'Configuration updated successfully',
+            data: updatedConfig
+        });
+    } catch (error) {
+        logger.error('Update admin config error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update configuration',
+            errorType: 'UPDATE_CONFIG_ERROR'
+        });
+    }
+});
+
+export default router;

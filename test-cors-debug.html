@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Test - ToolLink Backend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .test-section h3 {
+            color: #007bff;
+            margin-top: 0;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>CORS Test - ToolLink Backend</h1>
+        <p>This page will test various API endpoints to identify CORS issues.</p>
+
+        <div class="test-section">
+            <h3>1. Test Basic API Connection</h3>
+            <button onclick="testBasicAPI()">Test /api/docs</button>
+            <div id="basicResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Test Authentication Endpoint</h3>
+            <button onclick="testAuthEndpoint()">Test /api/auth/login (POST)</button>
+            <div id="authResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Test Users Endpoint</h3>
+            <button onclick="testUsersEndpoint()">Test /api/users (GET)</button>
+            <div id="usersResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Test Users-New Endpoint (The Problem One)</h3>
+            <button onclick="testUsersNewEndpoint()">Test /api/users-new (GET)</button>
+            <div id="usersNewResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. Test with Authentication</h3>
+            <button onclick="testWithAuth()">Login First, Then Test /api/users-new</button>
+            <div id="authTestResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>6. Test Preflight Request</h3>
+            <button onclick="testPreflight()">Test OPTIONS /api/users-new</button>
+            <div id="preflightResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+        let authToken = null;
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.className = `result ${type}`;
+            element.textContent = message;
+        }
+
+        async function testBasicAPI() {
+            showResult('basicResult', 'Testing basic API connection...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/docs`);
+                const data = await response.json();
+                showResult('basicResult',
+                    `✅ SUCCESS\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`,
+                    'success'
+                );
+            } catch (error) {
+                showResult('basicResult',
+                    `❌ ERROR\n${error.message}\n\nThis indicates a CORS or network issue.`,
+                    'error'
+                );
+            }
+        }
+
+        async function testAuthEndpoint() {
+            showResult('authResult', 'Testing auth endpoint...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@toollink.com',
+                        password: 'admin123'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.accessToken;
+                    showResult('authResult',
+                        `✅ SUCCESS\nStatus: ${response.status}\nLogin successful!\nToken received: ${!!authToken}`,
+                        'success'
+                    );
+                } else {
+                    const errorData = await response.json();
+                    showResult('authResult',
+                        `❌ FAILED\nStatus: ${response.status}\nError: ${JSON.stringify(errorData, null, 2)}`,
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult('authResult',
+                    `❌ ERROR\n${error.message}`,
+                    'error'
+                );
+            }
+        }
+
+        async function testUsersEndpoint() {
+            showResult('usersResult', 'Testing /api/users endpoint...', 'info');
+            try {
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                if (authToken) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                }
+
+                const response = await fetch(`${API_BASE}/users`, {
+                    method: 'GET',
+                    headers: headers
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('usersResult',
+                        `✅ SUCCESS\nStatus: ${response.status}\nUsers count: ${data.data?.length || 'N/A'}`,
+                        'success'
+                    );
+                } else {
+                    const errorData = await response.text();
+                    showResult('usersResult',
+                        `❌ FAILED\nStatus: ${response.status}\nError: ${errorData}`,
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult('usersResult',
+                    `❌ ERROR\n${error.message}`,
+                    'error'
+                );
+            }
+        }
+
+        async function testUsersNewEndpoint() {
+            showResult('usersNewResult', 'Testing /api/users-new endpoint (the problematic one)...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/users-new?limit=10&page=1`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult('usersNewResult',
+                        `✅ SUCCESS\nStatus: ${response.status}\nData: ${JSON.stringify(data, null, 2)}`,
+                        'success'
+                    );
+                } else {
+                    const errorData = await response.text();
+                    showResult('usersNewResult',
+                        `❌ FAILED\nStatus: ${response.status}\nResponse: ${errorData}`,
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult('usersNewResult',
+                    `❌ CORS ERROR\n${error.message}\n\nThis is the exact error you're seeing!`,
+                    'error'
+                );
+            }
+        }
+
+        async function testWithAuth() {
+            showResult('authTestResult', 'Testing with authentication flow...', 'info');
+
+            try {
+                // First login
+                const loginResponse = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@toollink.com',
+                        password: 'admin123'
+                    })
+                });
+
+                if (!loginResponse.ok) {
+                    throw new Error('Login failed');
+                }
+
+                const loginData = await loginResponse.json();
+                const token = loginData.accessToken;
+
+                // Then test users-new with token
+                const usersResponse = await fetch(`${API_BASE}/users-new?limit=10&page=1`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (usersResponse.ok) {
+                    const data = await usersResponse.json();
+                    showResult('authTestResult',
+                        `✅ SUCCESS WITH AUTH\nLogin: OK\nUsers-new: OK\nStatus: ${usersResponse.status}\nData count: ${data.users?.length || data.data?.length || 'N/A'}`,
+                        'success'
+                    );
+                } else {
+                    const errorData = await usersResponse.text();
+                    showResult('authTestResult',
+                        `❌ USERS-NEW FAILED\nLogin: OK\nUsers-new status: ${usersResponse.status}\nError: ${errorData}`,
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showResult('authTestResult',
+                    `❌ ERROR\n${error.message}`,
+                    'error'
+                );
+            }
+        }
+
+        async function testPreflight() {
+            showResult('preflightResult', 'Testing OPTIONS preflight request...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/users-new`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': 'http://localhost:5174',
+                        'Access-Control-Request-Method': 'GET',
+                        'Access-Control-Request-Headers': 'Content-Type,Authorization'
+                    }
+                });
+
+                const headers = {};
+                for (let [key, value] of response.headers.entries()) {
+                    headers[key] = value;
+                }
+
+                showResult('preflightResult',
+                    `Preflight Response\nStatus: ${response.status}\nHeaders: ${JSON.stringify(headers, null, 2)}`,
+                    response.status === 200 ? 'success' : 'error'
+                );
+            } catch (error) {
+                showResult('preflightResult',
+                    `❌ PREFLIGHT ERROR\n${error.message}`,
+                    'error'
+                );
+            }
+        }
+
+        // Auto-run basic test on page load
+        window.addEventListener('load', () => {
+            setTimeout(testBasicAPI, 1000);
+        });
+    </script>
+</body>
+
+</html>

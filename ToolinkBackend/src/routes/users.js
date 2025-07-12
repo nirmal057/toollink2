@@ -1,7 +1,8 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import User from '../models/User.js';
-import { authorize, adminOnly } from '../middleware/auth.js';
+import { authorize, adminOnly, authenticateToken, authOnly } from '../middleware/auth.js';
+import { getDashboardAccess, getRolePermissions } from '../middleware/roleAuth.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -95,6 +96,130 @@ router.get('/stats', adminOnly, async (req, res) => {
     }
 });
 
+// Get current user profile
+router.get('/profile', authenticateToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id)
+            .select('-password -refreshTokens');
+
+        res.json({
+            success: true,
+            data: user
+        });
+    } catch (error) {
+        logger.error('Get profile error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch profile',
+            errorType: 'FETCH_PROFILE_ERROR'
+        });
+    }
+});
+
+// Update current user profile
+router.put('/profile', authenticateToken, [
+    body('fullName').optional().trim().isLength({ min: 2, max: 100 }),
+    body('phone').optional().isMobilePhone(),
+    body('address').optional().isObject()
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: errors.array()
+            });
+        }
+
+        const allowedUpdates = ['fullName', 'phone', 'address', 'preferences'];
+        const updates = {};
+
+        allowedUpdates.forEach(field => {
+            if (req.body[field] !== undefined) {
+                updates[field] = req.body[field];
+            }
+        });
+
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                ...updates,
+                updatedAt: new Date(),
+                updatedBy: req.user._id
+            },
+            { new: true, runValidators: true }
+        ).select('-password -refreshTokens');
+
+        logger.info(`Profile updated for user: ${user.email}`);
+
+        res.json({
+            success: true,
+            message: 'Profile updated successfully',
+            data: user
+        });
+    } catch (error) {
+        logger.error('Update profile error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update profile',
+            errorType: 'UPDATE_PROFILE_ERROR'
+        });
+    }
+});
+
+// Get user dashboard data based on role
+router.get('/dashboard', authenticateToken, async (req, res) => {
+    try {
+        const user = req.user;
+        const dashboards = getDashboardAccess(user.role);
+        const permissions = getRolePermissions(user.role);
+
+        res.json({
+            success: true,
+            data: {
+                user: {
+                    id: user._id,
+                    username: user.username,
+                    email: user.email,
+                    fullName: user.fullName,
+                    role: user.role
+                },
+                dashboards,
+                permissions,
+                features: {
+                    canManageUsers: permissions.includes('users.view'),
+                    canManageInventory: permissions.includes('inventory.view'),
+                    canManageOrders: permissions.includes('orders.view'),
+                    canManageDelivery: permissions.includes('delivery.view'),
+                    canViewReports: permissions.includes('reports.view'),
+                    canManageContent: permissions.includes('content.view')
+                }
+            }
+        });
+    } catch (error) {
+        logger.error('Get dashboard error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch dashboard data',
+            errorType: 'FETCH_DASHBOARD_ERROR'
+        });
+    }
+});
+
+// Test endpoint to debug authentication
+router.get('/test-auth', authenticateToken, async (req, res) => {
+    res.json({
+        success: true,
+        message: 'Authentication working',
+        user: {
+            id: req.user._id,
+            email: req.user.email,
+            role: req.user.role
+        }
+    });
+});
+
 // Get single user
 router.get('/:id', adminOnly, async (req, res) => {
     try {
@@ -131,7 +256,15 @@ router.post('/', adminOnly, [
     body('email').isEmail().normalizeEmail(),
     body('password').isLength({ min: 6 }),
     body('fullName').trim().isLength({ min: 2, max: 100 }),
-    body('role').isIn(['admin', 'user', 'warehouse', 'cashier', 'customer', 'driver', 'editor'])
+    body('role').isIn([
+        'admin',           // Full system access
+        'warehouse',       // Warehouse management
+        'cashier',         // Point of sale operations
+        'customer',        // Customer access
+        'driver',          // Delivery operations
+        'editor',          // Content management
+        'user'             // General user access
+    ])
 ], async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -145,6 +278,9 @@ router.post('/', adminOnly, [
 
         const { username, email, password, fullName, phone, role, address } = req.body;
 
+        // Debug logging for password
+        logger.info(`Creating user with email: ${email}, role: ${role}, password provided: ${!!password}`);
+
         // Check if user already exists
         const existingUser = await User.findByEmailOrUsername(email);
         if (existingUser) {
@@ -152,6 +288,15 @@ router.post('/', adminOnly, [
                 success: false,
                 error: 'User already exists',
                 errorType: 'USER_EXISTS'
+            });
+        }
+
+        // Ensure password is provided
+        if (!password || password.length < 6) {
+            return res.status(400).json({
+                success: false,
+                error: 'Password must be at least 6 characters long',
+                errorType: 'INVALID_PASSWORD'
             });
         }
 
@@ -169,9 +314,13 @@ router.post('/', adminOnly, [
             createdBy: req.user._id
         });
 
+        // Log before save
+        logger.info(`Saving user: ${user.email} with role: ${user.role}`);
+
         await user.save();
 
-        logger.info(`User created: ${user.email} by ${req.user.fullName}`);
+        // Log after save with password confirmation
+        logger.info(`User created: ${user.email} with role ${user.role} (Password set: ${!!user.password})`);
 
         res.status(201).json({
             success: true,
@@ -315,86 +464,19 @@ router.delete('/:id', adminOnly, async (req, res) => {
     }
 });
 
-// Get current user profile
-router.get('/profile', async (req, res) => {
-    try {
-        const user = await User.findById(req.user._id)
-            .select('-password -refreshTokens');
-
-        res.json({
-            success: true,
-            data: user
-        });
-    } catch (error) {
-        logger.error('Get profile error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch profile',
-            errorType: 'FETCH_PROFILE_ERROR'
-        });
-    }
-});
-
-// Update current user profile
-router.put('/profile', [
-    body('fullName').optional().trim().isLength({ min: 2, max: 100 }),
-    body('phone').optional().isMobilePhone(),
-    body('address').optional().isObject()
-], async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                error: 'Validation failed',
-                details: errors.array()
-            });
-        }
-
-        const user = await User.findById(req.user._id);
-
-        // Update allowed fields
-        const allowedFields = ['fullName', 'phone', 'address', 'preferences'];
-
-        allowedFields.forEach(field => {
-            if (req.body[field] !== undefined) {
-                user[field] = req.body[field];
-            }
-        });
-
-        await user.save();
-
-        logger.info(`Profile updated by user: ${user.email}`);
-
-        res.json({
-            success: true,
-            message: 'Profile updated successfully',
-            user: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
-                fullName: user.fullName,
-                phone: user.phone,
-                address: user.address,
-                preferences: user.preferences,
-                updatedAt: user.updatedAt
-            }
-        });
-    } catch (error) {
-        logger.error('Update profile error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to update profile',
-            errorType: 'UPDATE_PROFILE_ERROR'
-        });
-    }
-});
-
 // Get users by role
 router.get('/role/:role', authorize('admin', 'cashier', 'warehouse'), async (req, res) => {
     try {
         const { role } = req.params;
-        const validRoles = ['admin', 'user', 'warehouse', 'cashier', 'customer', 'driver', 'editor'];
+        const validRoles = [
+            'admin',           // Full system access
+            'warehouse',       // Warehouse management
+            'cashier',         // Point of sale operations
+            'customer',        // Customer access
+            'driver',          // Delivery operations
+            'editor',          // Content management
+            'user'             // General user access
+        ];
 
         if (!validRoles.includes(role)) {
             return res.status(400).json({

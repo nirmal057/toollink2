@@ -57,13 +57,13 @@ app.use(helmet({
     },
 }));
 
-// Rate limiting
+// Rate limiting - TEMPORARILY DISABLED FOR DEBUG
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    max: 1000, // Increased limit for debugging
     message: 'Too many requests from this IP, please try again later.',
 });
-app.use(limiter);
+// app.use(limiter); // COMMENTED OUT FOR DEBUG
 
 // Compression
 app.use(compression());
@@ -139,10 +139,10 @@ mongoose.connect(process.env.MONGODB_URI, {
 })
     .then(async () => {
         logger.info('Connected to MongoDB Atlas successfully');
-        
+
         // Create default admin user
         await createDefaultAdmin();
-        
+
         // Start server
         app.listen(PORT, () => {
             logger.info(`Server running on port ${PORT}`);

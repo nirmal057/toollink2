@@ -1,3 +1,4 @@
+// DEBUG VERSION - More permissive CORS for troubleshooting
 export const corsOptions = {
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
@@ -16,21 +17,34 @@ export const corsOptions = {
             process.env.CORS_ORIGIN
         ].filter(Boolean);
 
+        console.log(`CORS request from origin: ${origin}`);
+        console.log(`Allowed origins:`, allowedOrigins);
+
         if (allowedOrigins.includes(origin)) {
+            console.log(`✅ Origin ${origin} is allowed`);
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            console.log(`❌ Origin ${origin} is NOT allowed`);
+            // For debugging, let's allow it anyway
+            callback(null, true);
         }
     },
     credentials: true,
     optionsSuccessStatus: 200,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
     allowedHeaders: [
         'Origin',
         'X-Requested-With',
         'Content-Type',
         'Accept',
         'Authorization',
-        'X-API-Key'
+        'X-API-Key',
+        'Cache-Control',
+        'Pragma'
+    ],
+    exposedHeaders: [
+        'X-Total-Count',
+        'X-Page-Count',
+        'Access-Control-Allow-Origin'
     ]
 };

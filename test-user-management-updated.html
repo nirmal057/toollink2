@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test User Management - Updated API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+
+        .error {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+
+        .user-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .user-table th,
+        .user-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .user-table th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>User Management API Test - Updated Endpoints</h1>
+
+        <div class="test-section">
+            <h3>1. Test User List (GET /api/users)</h3>
+            <button onclick="testUserList()">Get All Users</button>
+            <div id="userListResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Create New User (POST /api/users)</h3>
+            <button onclick="testCreateUser()">Create Test User</button>
+            <div id="createUserResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. User Statistics</h3>
+            <button onclick="showUserStats()">Show User Statistics</button>
+            <div id="userStatsResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Frontend Integration Test</h3>
+            <button onclick="testFrontendIntegration()">Test Frontend Service</button>
+            <div id="frontendResult" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:3000';
+
+        async function testUserList() {
+            const resultDiv = document.getElementById('userListResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+
+            try {
+                console.log('Fetching users from:', `${BASE_URL}/api/users`);
+
+                const response = await fetch(`${BASE_URL}/api/users`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+
+                if (response.ok) {
+                    let result = `✅ Successfully fetched ${data.length} users:\n\n`;
+
+                    // Create table
+                    let table = '<table class="user-table">';
+                    table += '<tr><th>Username</th><th>Email</th><th>Full Name</th><th>Role</th><th>Status</th><th>Created</th></tr>';
+
+                    data.forEach(user => {
+                        table += `<tr>
+                            <td>${user.username || 'N/A'}</td>
+                            <td>${user.email || 'N/A'}</td>
+                            <td>${user.fullName || 'N/A'}</td>
+                            <td>${user.role || 'N/A'}</td>
+                            <td>${user.status || 'N/A'}</td>
+                            <td>${user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
+                        </tr>`;
+                    });
+                    table += '</table>';
+
+                    resultDiv.innerHTML = result + table;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Error: ${data.message || 'Failed to fetch users'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Network Error: ${error.message}`;
+                console.error('Fetch error:', error);
+            }
+        }
+
+        async function testCreateUser() {
+            const resultDiv = document.getElementById('createUserResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+
+            const testUser = {
+                username: `testuser_${Date.now()}`,
+                email: `test_${Date.now()}@example.com`,
+                password: 'testPassword123',
+                fullName: 'Test User Created',
+                role: 'customer',
+                phone: '0771234567'
+            };
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testUser)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultDiv.textContent = `✅ User created successfully:\nID: ${data._id}\nUsername: ${data.username}\nEmail: ${data.email}\nRole: ${data.role}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Error: ${data.message || 'Failed to create user'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Network Error: ${error.message}`;
+            }
+        }
+
+        async function showUserStats() {
+            const resultDiv = document.getElementById('userStatsResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/users`);
+                const users = await response.json();
+
+                if (response.ok) {
+                    const stats = users.reduce((acc, user) => {
+                        acc.total++;
+                        acc.byRole[user.role] = (acc.byRole[user.role] || 0) + 1;
+                        acc.byStatus[user.status] = (acc.byStatus[user.status] || 0) + 1;
+                        return acc;
+                    }, { total: 0, byRole: {}, byStatus: {} });
+
+                    let result = `📊 User Statistics:\n\n`;
+                    result += `Total Users: ${stats.total}\n\n`;
+                    result += `By Role:\n`;
+                    Object.entries(stats.byRole).forEach(([role, count]) => {
+                        result += `  ${role}: ${count}\n`;
+                    });
+                    result += `\nBy Status:\n`;
+                    Object.entries(stats.byStatus).forEach(([status, count]) => {
+                        result += `  ${status}: ${count}\n`;
+                    });
+
+                    resultDiv.textContent = result;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ Error fetching user stats`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ Network Error: ${error.message}`;
+            }
+        }
+
+        async function testFrontendIntegration() {
+            const resultDiv = document.getElementById('frontendResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result';
+
+            resultDiv.textContent = `🔄 Testing frontend integration...\n\nThe UserApiService has been updated to use /api/users endpoint.\n\nTo test the frontend:\n1. Open the ToolLink frontend (http://localhost:5173)\n2. Login as admin (username: admin, password: admin123)\n3. Navigate to User Management\n4. Check if all users are now displayed\n\nExpected: All ${await getUserCount()} users should be visible in the management interface.`;
+        }
+
+        async function getUserCount() {
+            try {
+                const response = await fetch(`${BASE_URL}/api/users`);
+                const users = await response.json();
+                return response.ok ? users.length : 'unknown';
+            } catch {
+                return 'unknown';
+            }
+        }
+
+        // Auto-run user list test on page load
+        window.onload = () => {
+            testUserList();
+        };
+    </script>
+</body>
+
+</html>

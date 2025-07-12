@@ -95,6 +95,67 @@ export const optionalAuth = async (req, res, next) => {
     }
 };
 
+// Authentication-only middleware
+export const authOnly = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                error: 'Access token required',
+                errorType: 'MISSING_TOKEN'
+            });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.userId).select('-password -refreshTokens');
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid token - user not found',
+                errorType: 'INVALID_TOKEN'
+            });
+        }
+
+        if (!user.isActive) {
+            return res.status(401).json({
+                success: false,
+                error: 'Account is inactive',
+                errorType: 'ACCOUNT_INACTIVE'
+            });
+        }
+
+        req.user = user;
+        next();
+    } catch (error) {
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid token',
+                errorType: 'INVALID_TOKEN'
+            });
+        }
+
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({
+                success: false,
+                error: 'Token expired',
+                errorType: 'TOKEN_EXPIRED'
+            });
+        }
+
+        logger.error('Authentication error:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Authentication failed',
+            errorType: 'AUTHENTICATION_ERROR'
+        });
+    }
+};
+
 // Authorization middleware
 export const authorize = (...roles) => {
     return (req, res, next) => {
@@ -106,7 +167,7 @@ export const authorize = (...roles) => {
             });
         }
 
-        if (!roles.includes(req.user.role)) {
+        if (roles.length > 0 && !roles.includes(req.user.role)) {
             return res.status(403).json({
                 success: false,
                 error: 'Insufficient permissions',
@@ -121,7 +182,7 @@ export const authorize = (...roles) => {
 };
 
 // Admin only middleware
-export const adminOnly = authorize('admin');
+export const adminOnly = [authOnly, authorize('admin')];
 
 // Check if user owns resource or is admin
 export const ownerOrAdmin = (getOwnerId) => {

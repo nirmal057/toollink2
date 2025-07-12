@@ -3,10 +3,13 @@ import { body, validationResult } from 'express-validator';
 import Order from '../models/Order.js';
 import Inventory from '../models/Inventory.js';
 import User from '../models/User.js';
-import { authorize } from '../middleware/auth.js';
+import { authorize, authenticateToken } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
+
+// Apply authentication to all order routes
+router.use(authenticateToken);
 
 // Get all orders
 router.get('/', async (req, res) => {

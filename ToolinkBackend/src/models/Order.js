@@ -3,8 +3,8 @@ import mongoose from 'mongoose';
 const orderSchema = new mongoose.Schema({
     orderNumber: {
         type: String,
-        unique: true,
-        required: true
+        unique: true
+        // Not required here since it's auto-generated in pre-save hook
     },
     customer: {
         type: mongoose.Schema.Types.ObjectId,

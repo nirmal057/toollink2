@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToolLink User Management Frontend Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .success {
+            color: #28a745;
+        }
+
+        .error {
+            color: #dc3545;
+        }
+
+        .info {
+            color: #17a2b8;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 300px;
+        }
+
+        input,
+        select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🧪 ToolLink User Management Frontend Test</h1>
+        <p class="info">This page tests User Management functions directly from the browser</p>
+
+        <!-- Login Section -->
+        <div class="section">
+            <h3>1. Admin Login</h3>
+            <button onclick="adminLogin()">Login as Admin</button>
+            <div id="loginResult"></div>
+        </div>
+
+        <!-- Get Users Section -->
+        <div class="section">
+            <h3>2. Get All Users</h3>
+            <button onclick="getUsers()" id="getUsersBtn" disabled>Get Users</button>
+            <div id="usersResult"></div>
+        </div>
+
+        <!-- Add User Section -->
+        <div class="section">
+            <h3>3. Add New User</h3>
+            <div>
+                <input type="text" id="newUsername" placeholder="Username" value="frontend_test_user">
+                <input type="email" id="newEmail" placeholder="Email" value="frontend_test@toollink.com">
+                <input type="text" id="newFullName" placeholder="Full Name" value="Frontend Test User">
+                <input type="password" id="newPassword" placeholder="Password" value="test123">
+                <select id="newRole">
+                    <option value="customer">Customer</option>
+                    <option value="warehouse">Warehouse</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <button onclick="addUser()" id="addUserBtn" disabled>Add User</button>
+            <div id="addUserResult"></div>
+        </div>
+
+        <!-- Edit User Section -->
+        <div class="section">
+            <h3>4. Edit User</h3>
+            <div>
+                <input type="text" id="editUserId" placeholder="User ID (from users list)">
+                <input type="text" id="editFullName" placeholder="New Full Name" value="Updated Frontend Test User">
+                <select id="editRole">
+                    <option value="customer">Customer</option>
+                    <option value="warehouse">Warehouse</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <button onclick="editUser()" id="editUserBtn" disabled>Edit User</button>
+            <div id="editUserResult"></div>
+        </div>
+
+        <!-- Delete User Section -->
+        <div class="section">
+            <h3>5. Delete User</h3>
+            <input type="text" id="deleteUserId" placeholder="User ID (from users list)">
+            <button onclick="deleteUser()" id="deleteUserBtn" disabled>Delete User</button>
+            <div id="deleteUserResult"></div>
+        </div>
+
+        <!-- System Info -->
+        <div class="section">
+            <h3>📋 System Information</h3>
+            <div id="systemInfo">
+                <p><strong>Frontend URL:</strong> http://localhost:5173</p>
+                <p><strong>Backend URL:</strong> http://localhost:3000</p>
+                <p><strong>Test Time:</strong> <span id="currentTime"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+
+        // Update current time
+        document.getElementById('currentTime').textContent = new Date().toLocaleString();
+
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            element.innerHTML = `<div class="${className}">${message}</div>`;
+        }
+
+        function logData(elementId, data, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            element.innerHTML = `<div class="${className}"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+        }
+
+        async function adminLogin() {
+            try {
+                log('loginResult', 'Logging in as admin...', 'info');
+
+                const response = await fetch('http://localhost:3000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@toollink.com',
+                        password: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    authToken = data.accessToken;
+                    log('loginResult', '✅ Admin logged in successfully!', 'success');
+
+                    // Enable other buttons
+                    document.getElementById('getUsersBtn').disabled = false;
+                    document.getElementById('addUserBtn').disabled = false;
+                    document.getElementById('editUserBtn').disabled = false;
+                    document.getElementById('deleteUserBtn').disabled = false;
+                } else {
+                    log('loginResult', `❌ Login failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log('loginResult', `❌ Login error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getUsers() {
+            try {
+                log('usersResult', 'Fetching users...', 'info');
+
+                const response = await fetch('http://localhost:3000/api/users', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    log('usersResult', `✅ Found ${data.data.length} users`, 'success');
+                    logData('usersResult', data.data.map(user => ({
+                        id: user.id,
+                        username: user.username,
+                        email: user.email,
+                        fullName: user.fullName,
+                        role: user.role
+                    })), 'success');
+                } else {
+                    log('usersResult', `❌ Failed to get users: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log('usersResult', `❌ Get users error: ${error.message}`, 'error');
+            }
+        }
+
+        async function addUser() {
+            try {
+                const userData = {
+                    username: document.getElementById('newUsername').value,
+                    email: document.getElementById('newEmail').value,
+                    fullName: document.getElementById('newFullName').value,
+                    password: document.getElementById('newPassword').value,
+                    role: document.getElementById('newRole').value,
+                    phone: '+94771234567'
+                };
+
+                log('addUserResult', 'Creating user...', 'info');
+
+                const response = await fetch('http://localhost:3000/api/users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    log('addUserResult', '✅ User created successfully!', 'success');
+                    logData('addUserResult', data.user, 'success');
+
+                    // Auto-fill user ID in edit and delete sections
+                    document.getElementById('editUserId').value = data.user.id;
+                    document.getElementById('deleteUserId').value = data.user.id;
+                } else {
+                    log('addUserResult', `❌ Failed to create user: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log('addUserResult', `❌ Add user error: ${error.message}`, 'error');
+            }
+        }
+
+        async function editUser() {
+            try {
+                const userId = document.getElementById('editUserId').value;
+                const updateData = {
+                    fullName: document.getElementById('editFullName').value,
+                    role: document.getElementById('editRole').value
+                };
+
+                if (!userId) {
+                    log('editUserResult', '❌ Please enter a User ID', 'error');
+                    return;
+                }
+
+                log('editUserResult', 'Updating user...', 'info');
+
+                const response = await fetch(`http://localhost:3000/api/users/${userId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(updateData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    log('editUserResult', '✅ User updated successfully!', 'success');
+                    logData('editUserResult', data.user, 'success');
+                } else {
+                    log('editUserResult', `❌ Failed to update user: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log('editUserResult', `❌ Edit user error: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteUser() {
+            try {
+                const userId = document.getElementById('deleteUserId').value;
+
+                if (!userId) {
+                    log('deleteUserResult', '❌ Please enter a User ID', 'error');
+                    return;
+                }
+
+                if (!confirm(`Are you sure you want to delete user ${userId}?`)) {
+                    return;
+                }
+
+                log('deleteUserResult', 'Deleting user...', 'info');
+
+                const response = await fetch(`http://localhost:3000/api/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    log('deleteUserResult', '✅ User deleted successfully!', 'success');
+                    logData('deleteUserResult', data, 'success');
+
+                    // Clear the input fields
+                    document.getElementById('editUserId').value = '';
+                    document.getElementById('deleteUserId').value = '';
+                } else {
+                    log('deleteUserResult', `❌ Failed to delete user: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log('deleteUserResult', `❌ Delete user error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+
+</html>

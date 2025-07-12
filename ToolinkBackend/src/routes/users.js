@@ -19,7 +19,10 @@ router.get('/', adminOnly, async (req, res) => {
             sort = 'fullName'
         } = req.query;
 
-        const filter = { deletedAt: null };
+        const filter = {
+            deletedAt: null,
+            isApproved: true  // Only show approved users in user management
+        };
 
         if (role) {
             filter.role = role;

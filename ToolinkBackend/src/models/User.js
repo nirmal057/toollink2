@@ -277,7 +277,7 @@ userSchema.statics.getStatistics = async function () {
 // Static method to get role distribution
 userSchema.statics.getRoleDistribution = async function () {
     return await this.aggregate([
-        { $match: { isActive: true } },
+        { $match: { isActive: true, isApproved: true } }, // Only count approved users
         { $group: { _id: '$role', count: { $sum: 1 } } },
         { $sort: { count: -1 } }
     ]);

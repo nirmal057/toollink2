@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
 import User from '../models/User.js';
-import { generateTokens, verifyRefreshToken } from '../middleware/auth.js';
+import { generateTokens, verifyRefreshToken, authenticateToken, requireRole } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 import { sendEmail } from '../utils/emailService.js';
 import crypto from 'crypto';
@@ -183,7 +183,7 @@ router.post('/register', registerValidation, async (req, res) => {
             fullName,
             phone,
             role,
-            isApproved: role === 'customer' ? true : false, // Auto-approve customers
+            isApproved: role === 'customer' ? false : true, // Customers require approval
             emailVerified: false
         });
 
@@ -211,7 +211,10 @@ router.post('/register', registerValidation, async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: 'Registration successful. Please check your email to verify your account.',
+            message: role === 'customer' && !user.isApproved ?
+                'Registration successful. Your account is pending approval by an admin or cashier.' :
+                'Registration successful. Please check your email to verify your account.',
+            requiresApproval: role === 'customer' && !user.isApproved,
             user: {
                 id: user._id,
                 username: user.username,
@@ -519,6 +522,179 @@ router.post('/verify-email', [
             success: false,
             error: 'Failed to verify email',
             errorType: 'EMAIL_VERIFICATION_ERROR'
+        });
+    }
+});
+
+// Get pending users (customers waiting for approval)
+router.get('/pending-users', authenticateToken, requireRole(['admin', 'cashier']), async (req, res) => {
+    try {
+        const pendingUsers = await User.find({
+            isApproved: false,
+            isActive: true,
+            role: 'customer'
+        }).select('-password -refreshTokens').sort({ createdAt: -1 });
+
+        logger.info(`Found ${pendingUsers.length} pending users for approval`);
+
+        res.json({
+            success: true,
+            users: pendingUsers
+        });
+    } catch (error) {
+        logger.error('Error fetching pending users:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch pending users',
+            errorType: 'FETCH_PENDING_USERS_ERROR'
+        });
+    }
+});
+
+// Approve user
+router.post('/approve-user', [
+    body('userId').notEmpty()
+], authenticateToken, requireRole(['admin', 'cashier']), async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: errors.array()
+            });
+        }
+
+        const { userId } = req.body;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'User not found',
+                errorType: 'USER_NOT_FOUND'
+            });
+        }
+
+        if (user.isApproved) {
+            return res.status(400).json({
+                success: false,
+                error: 'User is already approved',
+                errorType: 'USER_ALREADY_APPROVED'
+            });
+        }
+
+        // Approve the user
+        user.isApproved = true;
+        await user.save();
+
+        // Log the approval action
+        logger.info(`User ${user.email} approved by ${req.user.email}`);
+
+        // Send approval notification email
+        try {
+            await sendEmail({
+                to: user.email,
+                subject: 'Account Approved - Welcome to ToolLink!',
+                template: 'account-approved',
+                data: {
+                    fullName: user.fullName,
+                    loginUrl: `${process.env.FRONTEND_URL}/auth/login`
+                }
+            });
+        } catch (emailError) {
+            logger.error('Failed to send approval email:', emailError);
+        }
+
+        res.json({
+            success: true,
+            message: 'User approved successfully',
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                fullName: user.fullName,
+                role: user.role,
+                isApproved: user.isApproved,
+                createdAt: user.createdAt
+            }
+        });
+    } catch (error) {
+        logger.error('Error approving user:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to approve user',
+            errorType: 'USER_APPROVAL_ERROR'
+        });
+    }
+});
+
+// Reject user
+router.post('/reject-user', [
+    body('userId').notEmpty(),
+    body('reason').optional().isString()
+], authenticateToken, requireRole(['admin', 'cashier']), async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validation failed',
+                details: errors.array()
+            });
+        }
+
+        const { userId, reason = 'No reason provided' } = req.body;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'User not found',
+                errorType: 'USER_NOT_FOUND'
+            });
+        }
+
+        if (user.isApproved) {
+            return res.status(400).json({
+                success: false,
+                error: 'Cannot reject an approved user',
+                errorType: 'USER_ALREADY_APPROVED'
+            });
+        }
+
+        // Log the rejection action
+        logger.info(`User ${user.email} rejected by ${req.user.email}. Reason: ${reason}`);
+
+        // Send rejection notification email
+        try {
+            await sendEmail({
+                to: user.email,
+                subject: 'Account Registration Update - ToolLink',
+                template: 'account-rejected',
+                data: {
+                    fullName: user.fullName,
+                    reason: reason,
+                    supportEmail: process.env.SUPPORT_EMAIL || 'support@toollink.com'
+                }
+            });
+        } catch (emailError) {
+            logger.error('Failed to send rejection email:', emailError);
+        }
+
+        // Delete the rejected user
+        await User.findByIdAndDelete(userId);
+
+        res.json({
+            success: true,
+            message: 'User rejected and removed successfully'
+        });
+    } catch (error) {
+        logger.error('Error rejecting user:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to reject user',
+            errorType: 'USER_REJECTION_ERROR'
         });
     }
 });

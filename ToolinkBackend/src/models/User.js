@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const userSchema = new mongoose.Schema({
     username: {
@@ -208,7 +209,6 @@ userSchema.methods.resetLoginAttempts = async function () {
 
 // Method to generate password reset token
 userSchema.methods.generatePasswordResetToken = function () {
-    const crypto = require('crypto');
     const token = crypto.randomBytes(32).toString('hex');
 
     this.passwordResetToken = crypto.createHash('sha256').update(token).digest('hex');
@@ -219,7 +219,6 @@ userSchema.methods.generatePasswordResetToken = function () {
 
 // Method to generate email verification token
 userSchema.methods.generateEmailVerificationToken = function () {
-    const crypto = require('crypto');
     const token = crypto.randomBytes(32).toString('hex');
 
     this.emailVerificationToken = crypto.createHash('sha256').update(token).digest('hex');

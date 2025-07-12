@@ -1,5 +1,5 @@
 import express from 'express';
-import { authorize } from '../middleware/auth.js';
+import { authorize, authenticateToken } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -39,7 +39,7 @@ const mockNotifications = [
 ];
 
 // Get all notifications for user
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
     try {
         const { type, priority, read, page = 1, limit = 20 } = req.query;
 
@@ -124,8 +124,35 @@ router.get('/stats', async (req, res) => {
     }
 });
 
+// Get unread notifications count
+router.get('/unread-count', authenticateToken, async (req, res) => {
+    try {
+        const userNotifications = mockNotifications.filter(n =>
+            n.userId === null || n.userId === req.user._id.toString()
+        );
+
+        const unreadCount = userNotifications.filter(n => !n.read).length;
+
+        logger.info(`Unread notifications count: ${unreadCount} for user ${req.user._id}`);
+
+        res.json({
+            success: true,
+            data: {
+                count: unreadCount
+            }
+        });
+    } catch (error) {
+        logger.error('Get unread count error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch unread count',
+            errorType: 'FETCH_UNREAD_COUNT_ERROR'
+        });
+    }
+});
+
 // Get single notification
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
     try {
         const notification = mockNotifications.find(n => n.id === req.params.id);
 
@@ -303,33 +330,6 @@ router.delete('/:id', async (req, res) => {
             success: false,
             error: 'Failed to delete notification',
             errorType: 'DELETE_NOTIFICATION_ERROR'
-        });
-    }
-});
-
-// Get unread notifications count
-router.get('/unread-count', async (req, res) => {
-    try {
-        const userNotifications = mockNotifications.filter(n =>
-            n.userId === null || n.userId === req.user._id.toString()
-        );
-
-        const unreadCount = userNotifications.filter(n => !n.read).length;
-
-        logger.info(`Unread notifications count: ${unreadCount} for user ${req.user._id}`);
-
-        res.json({
-            success: true,
-            data: {
-                count: unreadCount
-            }
-        });
-    } catch (error) {
-        logger.error('Get unread count error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch unread count',
-            errorType: 'FETCH_UNREAD_COUNT_ERROR'
         });
     }
 });

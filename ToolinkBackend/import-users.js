@@ -3,7 +3,7 @@ import XLSX from 'xlsx';
 import { config } from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import User from './src/models/UserNew.js';
+import User from './src/models/User.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

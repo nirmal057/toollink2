@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Frontend User Creation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .debug-info {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .validation-error {
+            color: #dc3545;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🐛 Debug Frontend User Creation Form</h1>
+
+        <div class="debug-info">
+            <strong>Debug Status:</strong>
+            <div id="debugStatus">Loading...</div>
+        </div>
+
+        <form id="userCreationForm">
+            <div class="form-group">
+                <label for="username">Username *</label>
+                <input type="text" id="username" name="username" required placeholder="Enter username"
+                    value="testuser_debug_frontend">
+                <div class="validation-error" id="usernameError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email *</label>
+                <input type="email" id="email" name="email" required placeholder="Enter email address"
+                    value="testuser.frontend@toollink.com">
+                <div class="validation-error" id="emailError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password *</label>
+                <input type="password" id="password" name="password" required placeholder="Enter password"
+                    value="TestPassword123!">
+                <div class="validation-error" id="passwordError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="fullName">Full Name *</label>
+                <input type="text" id="fullName" name="fullName" required placeholder="Enter full name"
+                    value="Frontend Debug Test User">
+                <div class="validation-error" id="fullNameError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone</label>
+                <input type="text" id="phone" name="phone" placeholder="+94771234567" value="+94771234567">
+                <div class="validation-error" id="phoneError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="role">Role *</label>
+                <select id="role" name="role" required>
+                    <option value="customer">Customer</option>
+                    <option value="cashier">Cashier</option>
+                    <option value="warehouse">Warehouse</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <div class="validation-error" id="roleError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="nicNumber">NIC Number</label>
+                <input type="text" id="nicNumber" name="nicNumber" placeholder="199512345678" value="199512345678">
+            </div>
+
+            <button type="submit" id="submitBtn">Create User</button>
+        </form>
+
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        let authToken = null;
+        const BASE_URL = 'http://localhost:3000';
+
+        // Check initial status
+        async function checkInitialStatus() {
+            const statusDiv = document.getElementById('debugStatus');
+
+            try {
+                // Test server connectivity
+                const response = await fetch(`${BASE_URL}/api/auth/health`);
+                const serverUp = response.status !== 0;
+
+                // Try to authenticate
+                const authResponse = await fetch(`${BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@toollink.com',
+                        password: 'admin123'
+                    })
+                });
+
+                if (authResponse.ok) {
+                    const authData = await authResponse.json();
+                    authToken = authData.accessToken;
+                    statusDiv.innerHTML = `
+                        ✅ Server: Connected<br>
+                        ✅ Authentication: Success<br>
+                        ✅ Token: ${authToken ? 'Received' : 'Missing'}<br>
+                        🚀 Ready to test form submission
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        ✅ Server: Connected<br>
+                        ❌ Authentication: Failed<br>
+                        ⚠️ Cannot test user creation without auth
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    ❌ Server: Not responding<br>
+                    ❌ Error: ${error.message}<br>
+                    🔧 Please check if backend is running
+                `;
+            }
+        }
+
+        // Form validation
+        function validateForm() {
+            const errors = {};
+            let isValid = true;
+
+            // Clear previous errors
+            document.querySelectorAll('.validation-error').forEach(el => el.textContent = '');
+
+            // Username validation
+            const username = document.getElementById('username').value.trim();
+            if (!username) {
+                errors.username = 'Username is required';
+                isValid = false;
+            } else if (username.length < 3) {
+                errors.username = 'Username must be at least 3 characters';
+                isValid = false;
+            }
+
+            // Email validation
+            const email = document.getElementById('email').value.trim();
+            if (!email) {
+                errors.email = 'Email is required';
+                isValid = false;
+            } else if (!/\S+@\S+\.\S+/.test(email)) {
+                errors.email = 'Please enter a valid email';
+                isValid = false;
+            }
+
+            // Password validation
+            const password = document.getElementById('password').value;
+            if (!password) {
+                errors.password = 'Password is required';
+                isValid = false;
+            } else if (password.length < 8) {
+                errors.password = 'Password must be at least 8 characters';
+                isValid = false;
+            }
+
+            // Full name validation
+            const fullName = document.getElementById('fullName').value.trim();
+            if (!fullName) {
+                errors.fullName = 'Full name is required';
+                isValid = false;
+            }
+
+            // Phone validation (if provided)
+            const phone = document.getElementById('phone').value.trim();
+            if (phone && phone.length !== 12) {
+                errors.phone = 'Phone must be 12 characters (+94 + 9 digits)';
+                isValid = false;
+            }
+
+            // Display errors
+            Object.keys(errors).forEach(field => {
+                const errorDiv = document.getElementById(field + 'Error');
+                if (errorDiv) {
+                    errorDiv.textContent = errors[field];
+                }
+            });
+
+            return isValid;
+        }
+
+        // Form submission handler
+        document.getElementById('userCreationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            console.log('🔥 Form submission triggered!');
+
+            const resultDiv = document.getElementById('result');
+            const submitBtn = document.getElementById('submitBtn');
+
+            // Show processing state
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating User...';
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result info';
+            resultDiv.textContent = '🔄 Processing form submission...\n\n';
+
+            try {
+                // Step 1: Validate form
+                console.log('📝 Validating form...');
+                resultDiv.textContent += '📝 Step 1: Validating form...\n';
+
+                if (!validateForm()) {
+                    throw new Error('Form validation failed');
+                }
+
+                resultDiv.textContent += '✅ Form validation passed\n\n';
+
+                // Step 2: Check authentication
+                console.log('🔐 Checking authentication...');
+                resultDiv.textContent += '🔐 Step 2: Checking authentication...\n';
+
+                if (!authToken) {
+                    throw new Error('No authentication token available');
+                }
+
+                resultDiv.textContent += '✅ Authentication token available\n\n';
+
+                // Step 3: Prepare user data
+                const formData = new FormData(e.target);
+                const userData = {
+                    username: formData.get('username'),
+                    email: formData.get('email'),
+                    password: formData.get('password'),
+                    fullName: formData.get('fullName'),
+                    phone: formData.get('phone') || undefined,
+                    role: formData.get('role'),
+                    nicNumber: formData.get('nicNumber') || undefined
+                };
+
+                console.log('📋 User data prepared:', userData);
+                resultDiv.textContent += '📋 Step 3: User data prepared\n';
+                resultDiv.textContent += JSON.stringify(userData, null, 2) + '\n\n';
+
+                // Step 4: Send API request
+                console.log('🌐 Sending API request...');
+                resultDiv.textContent += '🌐 Step 4: Sending API request to /api/users...\n';
+
+                const response = await fetch(`${BASE_URL}/api/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                resultDiv.textContent += `📡 Response status: ${response.status}\n`;
+
+                const responseData = await response.json();
+                console.log('📨 API response:', responseData);
+
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent += '\n🎉 SUCCESS! User created successfully!\n\n';
+                    resultDiv.textContent += 'Response data:\n';
+                    resultDiv.textContent += JSON.stringify(responseData, null, 2);
+
+                    // Clear form
+                    document.getElementById('userCreationForm').reset();
+                } else {
+                    throw new Error(`API Error: ${responseData.error || responseData.message || 'Unknown error'}`);
+                }
+
+            } catch (error) {
+                console.error('❌ Form submission error:', error);
+                resultDiv.className = 'result error';
+                resultDiv.textContent += `\n❌ ERROR: ${error.message}\n\n`;
+                resultDiv.textContent += 'Check browser console for more details.';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create User';
+            }
+        });
+
+        // Initialize on page load
+        window.onload = checkInitialStatus;
+    </script>
+</body>
+
+</html>

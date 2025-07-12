@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { config } from 'dotenv';
-import UserNew from './src/models/UserNew.js';
+import User from './src/models/User.js';
 
 // Load environment variables
 config();
@@ -120,12 +120,12 @@ async function importUsers() {
 
         // Clear existing users
         console.log('Clearing existing users...');
-        await UserNew.deleteMany({});
+        await User.deleteMany({});
         console.log('Existing users cleared');
 
         // Import new users
         console.log('Importing new users...');
-        const result = await UserNew.insertMany(users);
+        const result = await User.insertMany(users);
 
         console.log(`Successfully imported ${result.length} users`);
 

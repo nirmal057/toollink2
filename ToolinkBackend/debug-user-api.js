@@ -34,15 +34,20 @@ async function testUserAPIs() {
         const usersData = await usersResponse.json();
         console.log('Response data:', JSON.stringify(usersData, null, 2));
 
-        // Step 3: Test the users-new endpoint (alternative)
-        console.log('\n📋 Step 3: Testing GET /api/users-new (Alternative endpoint)...');
+        // Step 3: Verify old endpoint is removed (should return 404)
+        console.log('\n📋 Step 3: Verifying old /api/users-new endpoint is removed...');
         const usersNewResponse = await fetch('http://localhost:3000/api/users-new', {
             headers: { 'Authorization': `Bearer ${adminToken}` }
         });
 
         console.log('Response status:', usersNewResponse.status);
-        const usersNewData = await usersNewResponse.json();
-        console.log('Response data:', JSON.stringify(usersNewData, null, 2));
+        if (usersNewResponse.status === 404) {
+            console.log('✅ Old endpoint properly removed - returns 404');
+        } else {
+            console.log('⚠️  Old endpoint still accessible - needs cleanup');
+            const usersNewData = await usersNewResponse.json();
+            console.log('Response data:', JSON.stringify(usersNewData, null, 2));
+        }
 
         // Step 4: Check what users are actually in the database
         console.log('\n🗄️  Step 4: Checking database directly...');

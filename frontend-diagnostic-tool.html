@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToolLink Frontend Diagnostic</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .test-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .test-section h3 {
+            margin-top: 0;
+            color: #495057;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+        }
+
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .status-card {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-ok {
+            background: #28a745;
+        }
+
+        .status-error {
+            background: #dc3545;
+        }
+
+        .status-warning {
+            background: #ffc107;
+        }
+
+        .status-pending {
+            background: #6c757d;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 ToolLink Frontend Diagnostic Tool</h1>
+            <p>Comprehensive testing for user creation form issues</p>
+        </div>
+
+        <div class="content">
+            <div class="status-grid">
+                <div class="status-card">
+                    <h4><span class="status-indicator status-pending"></span>Backend Connection</h4>
+                    <div id="backendStatus">Testing...</div>
+                </div>
+                <div class="status-card">
+                    <h4><span class="status-indicator status-pending"></span>Authentication</h4>
+                    <div id="authStatus">Testing...</div>
+                </div>
+                <div class="status-card">
+                    <h4><span class="status-indicator status-pending"></span>API Endpoints</h4>
+                    <div id="apiStatus">Testing...</div>
+                </div>
+                <div class="status-card">
+                    <h4><span class="status-indicator status-pending"></span>Frontend Form</h4>
+                    <div id="formStatus">Testing...</div>
+                </div>
+            </div>
+
+            <div class="test-section">
+                <h3>🧪 Quick Tests</h3>
+                <button onclick="runFullDiagnostic()">Run Full Diagnostic</button>
+                <button onclick="testBackendConnection()">Test Backend</button>
+                <button onclick="testUserCreation()">Test User Creation</button>
+                <button onclick="testFrontendAccess()">Test Frontend Access</button>
+                <button onclick="clearResults()">Clear Results</button>
+                <div id="quickTestResult" class="result info" style="display: none;"></div>
+            </div>
+
+            <div class="test-section">
+                <h3>🎯 Frontend Form Analysis</h3>
+                <p>This test checks if the main ToolLink frontend is accessible and analyzes the user creation form.</p>
+                <button onclick="openMainApp()">Open Main App</button>
+                <button onclick="analyzeFrontendForm()">Analyze Form Structure</button>
+                <button onclick="injectDebugScript()">Inject Debug Script</button>
+                <div id="frontendResult" class="result info" style="display: none;"></div>
+            </div>
+
+            <div class="test-section">
+                <h3>🔍 Step-by-Step User Creation Test</h3>
+                <p>This simulates the exact steps a user would take to create a new user.</p>
+                <button onclick="simulateUserCreation()">Simulate Complete Flow</button>
+                <button onclick="testFormValidation()">Test Form Validation</button>
+                <button onclick="testApiCallDirect()">Test API Call Direct</button>
+                <div id="simulationResult" class="result info" style="display: none;"></div>
+            </div>
+
+            <div class="test-section">
+                <h3>📋 Instructions for Manual Testing</h3>
+                <div class="info result">
+                    1. Click "Open Main App" to open the ToolLink frontend
+                    2. Login as admin using: admin@toollink.com / admin123
+                    3. Navigate to User Management
+                    4. Try to add a new user
+                    5. Check browser console (F12) for any JavaScript errors
+                    6. If form doesn't submit, come back here and run "Inject Debug Script"
+                    7. Go back to the main app and try again - debug info will appear in console
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:3000';
+        const FRONTEND_URL = 'http://localhost:5173';
+        let authToken = null;
+
+        // Update status indicators
+        function updateStatus(elementId, status, message) {
+            const element = document.getElementById(elementId);
+            const indicator = element.parentElement.querySelector('.status-indicator');
+
+            indicator.className = `status-indicator status-${status}`;
+            element.innerHTML = message;
+        }
+
+        // Show result in specified div
+        function showResult(divId, message, type = 'info') {
+            const div = document.getElementById(divId);
+            div.style.display = 'block';
+            div.className = `result ${type}`;
+            div.textContent = message;
+        }
+
+        // Clear all results
+        function clearResults() {
+            document.querySelectorAll('.result').forEach(div => {
+                div.style.display = 'none';
+            });
+        }
+
+        // Test backend connection
+        async function testBackendConnection() {
+            try {
+                updateStatus('backendStatus', 'pending', 'Testing connection...');
+
+                const response = await fetch(`${BASE_URL}/api/auth/health`);
+                const isUp = response.status !== 0;
+
+                if (isUp) {
+                    updateStatus('backendStatus', 'ok', '✅ Backend responding');
+                    return true;
+                } else {
+                    updateStatus('backendStatus', 'error', '❌ Backend not responding');
+                    return false;
+                }
+            } catch (error) {
+                updateStatus('backendStatus', 'error', `❌ Connection failed: ${error.message}`);
+                return false;
+            }
+        }
+
+        // Test authentication
+        async function testAuthentication() {
+            try {
+                updateStatus('authStatus', 'pending', 'Testing admin login...');
+
+                const response = await fetch(`${BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@toollink.com',
+                        password: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    authToken = data.accessToken;
+                    updateStatus('authStatus', 'ok', '✅ Admin authentication successful');
+                    return true;
+                } else {
+                    updateStatus('authStatus', 'error', `❌ Auth failed: ${data.error || 'Unknown error'}`);
+                    return false;
+                }
+            } catch (error) {
+                updateStatus('authStatus', 'error', `❌ Auth error: ${error.message}`);
+                return false;
+            }
+        }
+
+        // Test API endpoints
+        async function testApiEndpoints() {
+            try {
+                updateStatus('apiStatus', 'pending', 'Testing API endpoints...');
+
+                if (!authToken) {
+                    updateStatus('apiStatus', 'error', '❌ No auth token available');
+                    return false;
+                }
+
+                // Test users endpoint
+                const usersResponse = await fetch(`${BASE_URL}/api/users`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                // Test notifications endpoint
+                const notificationsResponse = await fetch(`${BASE_URL}/api/notifications/unread-count`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (usersResponse.ok && notificationsResponse.ok) {
+                    const usersData = await usersResponse.json();
+                    const userCount = usersData.data?.length || 0;
+                    updateStatus('apiStatus', 'ok', `✅ API endpoints working (${userCount} users)`);
+                    return true;
+                } else {
+                    updateStatus('apiStatus', 'error', '❌ Some API endpoints failing');
+                    return false;
+                }
+            } catch (error) {
+                updateStatus('apiStatus', 'error', `❌ API test error: ${error.message}`);
+                return false;
+            }
+        }
+
+        // Test frontend accessibility
+        async function testFrontendAccess() {
+            try {
+                updateStatus('formStatus', 'pending', 'Testing frontend access...');
+
+                const response = await fetch(FRONTEND_URL);
+
+                if (response.ok) {
+                    updateStatus('formStatus', 'ok', '✅ Frontend accessible');
+                    return true;
+                } else {
+                    updateStatus('formStatus', 'error', '❌ Frontend not accessible');
+                    return false;
+                }
+            } catch (error) {
+                updateStatus('formStatus', 'error', `❌ Frontend error: ${error.message}`);
+                return false;
+            }
+        }
+
+        // Run full diagnostic
+        async function runFullDiagnostic() {
+            showResult('quickTestResult', '🔄 Running full diagnostic...\\n\\n', 'info');
+
+            let results = [];
+
+            const backendOk = await testBackendConnection();
+            results.push(`Backend: ${backendOk ? '✅ OK' : '❌ FAIL'}`);
+
+            const authOk = await testAuthentication();
+            results.push(`Authentication: ${authOk ? '✅ OK' : '❌ FAIL'}`);
+
+            const apiOk = await testApiEndpoints();
+            results.push(`API Endpoints: ${apiOk ? '✅ OK' : '❌ FAIL'}`);
+
+            const frontendOk = await testFrontendAccess();
+            results.push(`Frontend: ${frontendOk ? '✅ OK' : '❌ FAIL'}`);
+
+            const allGood = backendOk && authOk && apiOk && frontendOk;
+
+            const summary = allGood
+                ? '🎉 All systems operational! The issue is likely in the frontend form logic.'
+                : '⚠️ Some systems have issues. Fix these first before testing the form.';
+
+            showResult('quickTestResult', `Diagnostic Results:\\n${results.join('\\n')}\\n\\n${summary}`, allGood ? 'success' : 'warning');
+        }
+
+        // Test user creation via API
+        async function testUserCreation() {
+            if (!authToken) {
+                await testAuthentication();
+            }
+
+            if (!authToken) {
+                showResult('quickTestResult', '❌ Cannot test user creation without authentication', 'error');
+                return;
+            }
+
+            try {
+                showResult('quickTestResult', '🔄 Testing user creation via API...\\n\\n', 'info');
+
+                const userData = {
+                    username: `diagnostic_test_${Date.now()}`,
+                    email: `diagnostic_${Date.now()}@toollink.com`,
+                    password: 'TestPassword123!',
+                    fullName: 'Diagnostic Test User',
+                    phone: '+94771234567',
+                    role: 'customer'
+                };
+
+                const response = await fetch(`${BASE_URL}/api/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showResult('quickTestResult', `✅ User creation successful!\\n\\nAPI Response:\\n${JSON.stringify(result, null, 2)}\\n\\n💡 The backend is working correctly. The issue is in the frontend form.`, 'success');
+                } else {
+                    showResult('quickTestResult', `❌ User creation failed!\\n\\nError:\\n${JSON.stringify(result, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                showResult('quickTestResult', `❌ User creation error: ${error.message}`, 'error');
+            }
+        }
+
+        // Open main application
+        function openMainApp() {
+            window.open(FRONTEND_URL, '_blank');
+            showResult('frontendResult', '🌐 Main application opened in new tab.\\n\\nNow login as admin and try to create a user.\\nIf the form does not submit, check the browser console for errors.', 'info');
+        }
+
+        // Inject debug script into main app
+        function injectDebugScript() {
+            const script = `
+                console.log('🔍 ToolLink Debug Script Injected');
+
+                // Listen for form submissions
+                document.addEventListener('submit', (e) => {
+                    console.log('🚀 FORM SUBMISSION DETECTED!');
+                    console.log('Form:', e.target);
+                    console.log('Form data:', new FormData(e.target));
+                    console.log('Event details:', e);
+                }, true);
+
+                // Listen for button clicks
+                document.addEventListener('click', (e) => {
+                    if (e.target.type === 'submit' || e.target.tagName === 'BUTTON') {
+                        console.log('🖱️ BUTTON CLICKED!');
+                        console.log('Button:', e.target);
+                        console.log('Button text:', e.target.textContent);
+                        console.log('Form:', e.target.form);
+                    }
+                }, true);
+
+                // Check for errors
+                window.addEventListener('error', (e) => {
+                    console.log('🚨 JAVASCRIPT ERROR:', e);
+                });
+
+                console.log('✅ Debug listeners active. Try submitting the form now.');
+            `;
+            navigator.clipboard.writeText(script).then(() => {
+                showResult('frontendResult', '📋 Debug script copied to clipboard!\\n\\nSteps:\\n1. Open the main app\\n2. Open browser console (F12)\\n3. Paste and run the script\\n4. Try to submit the user creation form\\n5. Watch the console for debug output', 'success');
+            }).catch(() => {
+                showResult('frontendResult', '📋 Debug script ready!\\n\\nCopy this script and run it in the main app console:\\n\\n' + script, 'info');
+            });
+        }
+
+        // Simulate complete user creation flow
+        async function simulateUserCreation() {
+            showResult('simulationResult', '🎭 Simulating complete user creation flow...\\n\\n', 'info');
+
+            let log = '';
+
+            // Step 1: Test backend
+            log += '1️⃣ Testing backend connection...\\n';
+            const backendOk = await testBackendConnection();
+            log += backendOk ? '✅ Backend OK\\n' : '❌ Backend FAIL\\n';
+
+            // Step 2: Test auth
+            log += '\\n2️⃣ Testing authentication...\\n';
+            const authOk = await testAuthentication();
+            log += authOk ? '✅ Auth OK\\n' : '❌ Auth FAIL\\n';
+
+            // Step 3: Test user creation
+            if (authOk) {
+                log += '\\n3️⃣ Testing user creation...\\n';
+                await testUserCreation();
+                log += 'See result above for user creation test.\\n';
+            }
+
+            // Step 4: Analysis
+            log += '\\n4️⃣ Analysis:\\n';
+            if (backendOk && authOk) {
+                log += '✅ Backend systems are working correctly\\n';
+                log += '💡 The issue is in the frontend form submission\\n';
+                log += '🔧 Recommended fixes:\\n';
+                log += '  - Check browser console for JavaScript errors\\n';
+                log += '  - Verify form validation is not blocking submission\\n';
+                log += '  - Check if event handlers are properly attached\\n';
+                log += '  - Use the debug script to monitor form events\\n';
+            } else {
+                log += '❌ Backend issues detected - fix these first\\n';
+            }
+
+            showResult('simulationResult', log, backendOk && authOk ? 'success' : 'error');
+        }
+
+        // Initialize
+        window.onload = () => {
+            runFullDiagnostic();
+        };
+    </script>
+</body>
+
+</html>

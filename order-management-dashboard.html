@@ -476,9 +476,13 @@
                 <button class="btn btn-primary" onclick="openNewOrderModal()">
                     ➕ New Order
                 </button>
-                <button class="btn btn-success" onclick="loadOrders()">
-                    🔄 Refresh
+                <button class="btn btn-success" onclick="refreshOrders()" id="refreshBtn">
+                    <span id="refreshIcon">🔄</span> Refresh
                 </button>
+                <button class="btn" onclick="debugInfo()" style="background: #6c757d; color: white;">
+                    🔧 Debug
+                </button>
+                <small id="lastRefreshTime" style="color: #666; font-size: 12px; margin-left: 10px;"></small>
             </div>
 
             <div id="ordersContainer">
@@ -568,6 +572,14 @@
             await loadOrders();
         });
 
+        // Add keyboard shortcut for refresh (F5 or Ctrl+R)
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'F5' || (event.ctrlKey && event.key === 'r')) {
+                event.preventDefault();
+                refreshOrders();
+            }
+        });
+
         // Authentication
         async function authenticate() {
             try {
@@ -647,6 +659,47 @@
                 }
             } catch (error) {
                 console.error('Error loading order stats:', error);
+            }
+        }
+
+        // Enhanced refresh function with loading feedback
+        async function refreshOrders() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            const refreshIcon = document.getElementById('refreshIcon');
+            const lastRefreshTime = document.getElementById('lastRefreshTime');
+
+            // Show loading state
+            refreshBtn.disabled = true;
+            refreshIcon.style.animation = 'spin 1s linear infinite';
+            refreshBtn.style.opacity = '0.7';
+            lastRefreshTime.textContent = 'Refreshing...';
+
+            try {
+                // Clear current search and filters for a full refresh
+                document.getElementById('searchInput').value = '';
+                document.getElementById('statusFilter').value = '';
+
+                // Load fresh data
+                await Promise.all([
+                    loadOrderStats(),
+                    loadOrders(1, '', '')
+                ]);
+
+                // Show success feedback
+                showAlert('Orders refreshed successfully!', 'success');
+
+                // Update last refresh time
+                const now = new Date();
+                lastRefreshTime.textContent = `Last refreshed: ${now.toLocaleTimeString()}`;
+
+            } catch (error) {
+                showAlert('Failed to refresh orders: ' + error.message, 'error');
+                lastRefreshTime.textContent = 'Refresh failed';
+            } finally {
+                // Reset button state
+                refreshBtn.disabled = false;
+                refreshIcon.style.animation = '';
+                refreshBtn.style.opacity = '1';
             }
         }
 
@@ -1093,24 +1146,72 @@
                 return;
             }
 
+            // Check if authenticated
+            if (!authToken) {
+                showAlert('❌ Not authenticated. Please refresh the page and try again.', 'error');
+                return;
+            }
+
             try {
+                console.log('Deleting order:', orderId);
+                console.log('API URL:', `${API_BASE}/orders/${orderId}`);
+                console.log('Auth token exists:', !!authToken);
+
                 const response = await fetch(`${API_BASE}/orders/${orderId}`, {
                     method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${authToken}` }
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
                 });
 
+                console.log('Delete response status:', response.status);
+
                 const result = await response.json();
+                console.log('Delete response data:', result);
 
                 if (result.success) {
-                    showAlert('Order deleted successfully! Inventory has been restored. 🗑️', 'success');
-                    await loadOrderStats();
-                    await loadOrders();
+                    showAlert('✅ Order deleted successfully! Inventory has been restored. 🗑️', 'success');
+                    // Refresh both stats and orders
+                    await Promise.all([
+                        loadOrderStats(),
+                        loadOrders()
+                    ]);
                 } else {
-                    showAlert('Failed to delete order: ' + (result.error || 'Unknown error'), 'error');
+                    console.error('Delete failed:', result);
+                    showAlert('❌ Failed to delete order: ' + (result.error || 'Unknown error'), 'error');
+
+                    // If unauthorized, try to re-authenticate
+                    if (response.status === 401) {
+                        showAlert('🔄 Authentication expired. Refreshing...', 'info');
+                        await authenticate();
+                    }
                 }
             } catch (error) {
-                showAlert('Error deleting order: ' + error.message, 'error');
+                console.error('Delete error:', error);
+                showAlert('❌ Error deleting order: ' + error.message, 'error');
             }
+        }
+
+        // Debug information
+        function debugInfo() {
+            const info = {
+                'API Base': API_BASE,
+                'Auth Token': authToken ? 'Present (length: ' + authToken.length + ')' : 'Missing',
+                'Current Page': currentPage,
+                'Total Orders': currentOrders.length,
+                'Pending Orders': currentOrders.filter(o => o.status === 'pending').length,
+                'User Agent': navigator.userAgent,
+                'Current URL': window.location.href
+            };
+
+            let debugText = 'DEBUG INFORMATION:\n\n';
+            for (const [key, value] of Object.entries(info)) {
+                debugText += `${key}: ${value}\n`;
+            }
+
+            alert(debugText);
+            console.log('Debug Info:', info);
         }
 
         // Show alert

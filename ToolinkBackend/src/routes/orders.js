@@ -606,7 +606,7 @@ router.patch('/:id/status', authorize('admin', 'cashier', 'warehouse'), async (r
     }
 });
 
-// Delete order (soft delete)
+// Delete order (permanent deletion)
 router.delete('/:id', authorize('admin', 'cashier'), async (req, res) => {
     try {
         const order = await Order.findById(req.params.id).populate('items.inventory', 'name');
@@ -675,22 +675,22 @@ router.delete('/:id', authorize('admin', 'cashier'), async (req, res) => {
             });
         }
 
-        // Soft delete order
-        order.deletedAt = new Date();
-        order.updatedBy = req.user._id;
-        await order.save();
+        // Hard delete order - permanently remove from database
+        const deletedOrder = {
+            id: order._id,
+            orderNumber: order.orderNumber,
+            deletedBy: req.user.fullName,
+            deletedAt: new Date()
+        };
 
-        logger.info(`Order deleted: ${order.orderNumber} by ${req.user.fullName}`);
+        await Order.findByIdAndDelete(order._id);
+
+        logger.info(`Order permanently deleted: ${order.orderNumber} by ${req.user.fullName}`);
 
         res.json({
             success: true,
-            message: 'Order deleted successfully',
-            data: {
-                id: order._id,
-                orderNumber: order.orderNumber,
-                deletedBy: req.user.fullName,
-                deletedAt: order.deletedAt
-            }
+            message: 'Order permanently deleted from database',
+            data: deletedOrder
         });
     } catch (error) {
         logger.error('Delete order error:', error);

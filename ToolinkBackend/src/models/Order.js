@@ -151,11 +151,7 @@ const orderSchema = new mongoose.Schema({
             ref: 'User'
         },
         notes: String
-    }],
-    deletedAt: {
-        type: Date,
-        default: null
-    }
+    }]
 }, {
     timestamps: true,
     toJSON: { virtuals: true },
@@ -183,7 +179,6 @@ orderSchema.index({ customer: 1 });
 orderSchema.index({ status: 1 });
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ 'delivery.estimatedDate': 1 });
-orderSchema.index({ deletedAt: 1 });
 
 // Pre-save middleware to generate order number
 orderSchema.pre('save', async function (next) {
@@ -198,8 +193,7 @@ orderSchema.pre('save', async function (next) {
         const todayEnd = new Date(year, today.getMonth(), today.getDate() + 1);
 
         const todayOrderCount = await this.constructor.countDocuments({
-            createdAt: { $gte: todayStart, $lt: todayEnd },
-            deletedAt: null
+            createdAt: { $gte: todayStart, $lt: todayEnd }
         });
 
         const orderSequence = String(todayOrderCount + 1).padStart(4, '0');
@@ -225,7 +219,6 @@ orderSchema.pre('save', async function (next) {
 // Static method to get order statistics
 orderSchema.statics.getStatistics = async function () {
     const stats = await this.aggregate([
-        { $match: { deletedAt: null } },
         {
             $group: {
                 _id: null,
@@ -243,7 +236,7 @@ orderSchema.statics.getStatistics = async function () {
 
     // Get monthly revenue
     const monthlyRevenue = await this.aggregate([
-        { $match: { deletedAt: null, status: { $in: ['delivered', 'shipped'] } } },
+        { $match: { status: { $in: ['delivered', 'shipped'] } } },
         {
             $group: {
                 _id: {
@@ -279,8 +272,7 @@ orderSchema.statics.getOrdersByCustomer = async function (customerId, options = 
     const { page = 1, limit = 10, status } = options;
 
     const filter = {
-        customer: customerId,
-        deletedAt: null
+        customer: customerId
     };
 
     if (status) {
@@ -324,9 +316,7 @@ orderSchema.statics.searchOrders = async function (query, options = {}) {
         sort = '-createdAt'
     } = options;
 
-    const filter = {
-        deletedAt: null
-    };
+    const filter = {};
 
     if (query) {
         filter.$or = [

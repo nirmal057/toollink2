@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
 import User from '../models/User.js';
+import PendingCustomer from '../models/PendingCustomer.js';
 import { generateTokens, verifyRefreshToken, authenticateToken, requireRole } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 import { sendEmail } from '../utils/emailService.js';
@@ -21,7 +22,7 @@ const registerValidation = [
     body('email').isEmail().normalizeEmail(),
     body('password').isLength({ min: 6 }),
     body('fullName').trim().isLength({ min: 2, max: 100 }),
-    body('phone').optional().isMobilePhone(),
+    body('phone').optional().matches(/^[\+]?[0-9\-\s\(\)]+$/).isLength({ min: 8, max: 20 }),
     body('role').optional().isIn(['customer', 'user', 'warehouse', 'cashier', 'driver', 'editor'])
 ];
 
@@ -39,7 +40,17 @@ router.post('/login', loginValidation, async (req, res) => {
 
         const { email, password } = req.body;
 
-        // Find user by email or username
+        // Check if this is a pending customer first
+        const pendingCustomer = await PendingCustomer.findByEmailOrUsername(email);
+        if (pendingCustomer) {
+            return res.status(401).json({
+                success: false,
+                error: 'Your account is pending approval. Please wait for a cashier or admin to approve your registration.',
+                errorType: 'ACCOUNT_PENDING_APPROVAL'
+            });
+        }
+
+        // Find user by email or username in main database
         const user = await User.findByEmailOrUsername(email);
         if (!user) {
             return res.status(401).json({
@@ -155,6 +166,102 @@ router.post('/register', registerValidation, async (req, res) => {
 
         const { username, email, password, fullName, phone, role = 'customer' } = req.body;
 
+        // For customer role: Check pending customers first, then regular users
+        if (role === 'customer') {
+            // Check if already in pending customers
+            const existingPendingCustomer = await PendingCustomer.findByEmailOrUsername(email);
+            if (existingPendingCustomer) {
+                return res.status(409).json({
+                    success: false,
+                    error: 'Customer registration already submitted and pending approval',
+                    errorType: 'REGISTRATION_PENDING'
+                });
+            }
+
+            // Check if username is taken in pending customers
+            const existingPendingUsername = await PendingCustomer.findOne({ username });
+            if (existingPendingUsername) {
+                return res.status(409).json({
+                    success: false,
+                    error: 'Username already taken',
+                    errorType: 'USERNAME_TAKEN'
+                });
+            }
+
+            // Check if user already exists in main database
+            const existingUser = await User.findByEmailOrUsername(email);
+            if (existingUser) {
+                return res.status(409).json({
+                    success: false,
+                    error: 'User already exists',
+                    errorType: 'USER_EXISTS'
+                });
+            }
+
+            // Check if username is taken in main database
+            const existingUsernameInMain = await User.findOne({ username });
+            if (existingUsernameInMain) {
+                return res.status(409).json({
+                    success: false,
+                    error: 'Username already taken',
+                    errorType: 'USERNAME_TAKEN'
+                });
+            }
+
+            // Create pending customer (NOT in main users database)
+            const pendingCustomer = new PendingCustomer({
+                username,
+                email,
+                password,
+                fullName,
+                phone,
+                role,
+                ipAddress: req.ip,
+                userAgent: req.get('User-Agent')
+            });
+
+            await pendingCustomer.save();
+
+            logger.info(`New customer registration submitted for approval: ${email}`);
+
+            // Send notification to admins/cashiers about new pending customer
+            try {
+                const adminUsers = await User.find({
+                    role: { $in: ['admin', 'cashier'] },
+                    isActive: true
+                }).select('email');
+
+                for (const admin of adminUsers) {
+                    await sendEmail({
+                        to: admin.email,
+                        subject: 'New Customer Registration Pending Approval',
+                        template: 'admin-new-customer-pending',
+                        data: {
+                            customerName: fullName,
+                            customerEmail: email,
+                            approvalUrl: `${process.env.FRONTEND_URL}/customer-approval`
+                        }
+                    });
+                }
+            } catch (emailError) {
+                logger.error('Failed to send admin notification emails:', emailError);
+            }
+
+            return res.status(201).json({
+                success: true,
+                message: 'Registration submitted successfully. Your account is pending approval by an admin or cashier. You will receive an email notification once your account is approved.',
+                requiresApproval: true,
+                status: 'pending',
+                pendingCustomer: {
+                    id: pendingCustomer._id,
+                    email: pendingCustomer.email,
+                    fullName: pendingCustomer.fullName,
+                    submittedAt: pendingCustomer.submittedAt
+                }
+            });
+        }
+
+        // For non-customer roles (admin, cashier, etc.) - create directly in main database
         // Check if user already exists
         const existingUser = await User.findByEmailOrUsername(email);
         if (existingUser) {
@@ -175,7 +282,7 @@ router.post('/register', registerValidation, async (req, res) => {
             });
         }
 
-        // Create new user
+        // Create new user (for non-customer roles)
         const user = new User({
             username,
             email,
@@ -183,7 +290,7 @@ router.post('/register', registerValidation, async (req, res) => {
             fullName,
             phone,
             role,
-            isApproved: role === 'customer' ? false : true, // Customers require approval
+            isApproved: true, // Non-customers are auto-approved
             emailVerified: false
         });
 
@@ -211,10 +318,8 @@ router.post('/register', registerValidation, async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: role === 'customer' && !user.isApproved ?
-                'Registration successful. Your account is pending approval by an admin or cashier.' :
-                'Registration successful. Please check your email to verify your account.',
-            requiresApproval: role === 'customer' && !user.isApproved,
+            message: 'Registration successful. Please check your email to verify your account.',
+            requiresApproval: false,
             user: {
                 id: user._id,
                 username: user.username,
@@ -529,24 +634,23 @@ router.post('/verify-email', [
 // Get pending users (customers waiting for approval)
 router.get('/pending-users', authenticateToken, requireRole(['admin', 'cashier']), async (req, res) => {
     try {
-        const pendingUsers = await User.find({
-            isApproved: false,
-            isActive: true,
-            role: 'customer'
-        }).select('-password -refreshTokens').sort({ createdAt: -1 });
+        const pendingCustomers = await PendingCustomer.find({
+            status: 'pending'
+        }).select('-password').sort({ submittedAt: -1 });
 
-        logger.info(`Found ${pendingUsers.length} pending users for approval`);
+        logger.info(`Found ${pendingCustomers.length} pending customers for approval`);
 
         res.json({
             success: true,
-            users: pendingUsers
+            users: pendingCustomers,
+            count: pendingCustomers.length
         });
     } catch (error) {
-        logger.error('Error fetching pending users:', error);
+        logger.error('Error fetching pending customers:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to fetch pending users',
-            errorType: 'FETCH_PENDING_USERS_ERROR'
+            error: 'Failed to fetch pending customers',
+            errorType: 'FETCH_PENDING_CUSTOMERS_ERROR'
         });
     }
 });
@@ -567,29 +671,47 @@ router.post('/approve-user', [
 
         const { userId } = req.body;
 
-        const user = await User.findById(userId);
-        if (!user) {
+        // Find pending customer
+        const pendingCustomer = await PendingCustomer.findById(userId);
+        if (!pendingCustomer) {
             return res.status(404).json({
                 success: false,
-                error: 'User not found',
-                errorType: 'USER_NOT_FOUND'
+                error: 'Pending customer not found',
+                errorType: 'PENDING_CUSTOMER_NOT_FOUND'
             });
         }
 
-        if (user.isApproved) {
-            return res.status(400).json({
+        // Check if customer already exists in main database (safety check)
+        const existingUser = await User.findByEmailOrUsername(pendingCustomer.email);
+        if (existingUser) {
+            // Remove from pending and return error
+            await PendingCustomer.findByIdAndDelete(userId);
+            return res.status(409).json({
                 success: false,
-                error: 'User is already approved',
-                errorType: 'USER_ALREADY_APPROVED'
+                error: 'Customer already exists in main database',
+                errorType: 'CUSTOMER_ALREADY_EXISTS'
             });
         }
 
-        // Approve the user
-        user.isApproved = true;
+        // Create user in main database from pending customer data
+        const userData = pendingCustomer.toUserData();
+        const user = new User(userData);
+
+        // Skip password hashing since it's already hashed in PendingCustomer
+        user.isModified = function (path) {
+            if (path === 'password') return false;
+            return this.constructor.prototype.isModified.call(this, path);
+        };
+
+        // Generate email verification token
+        const verificationToken = user.generateEmailVerificationToken();
         await user.save();
 
+        // Remove from pending customers collection
+        await PendingCustomer.findByIdAndDelete(userId);
+
         // Log the approval action
-        logger.info(`User ${user.email} approved by ${req.user.email}`);
+        logger.info(`Customer ${pendingCustomer.email} approved by ${req.user.email} and moved to main database`);
 
         // Send approval notification email
         try {
@@ -599,7 +721,8 @@ router.post('/approve-user', [
                 template: 'account-approved',
                 data: {
                     fullName: user.fullName,
-                    loginUrl: `${process.env.FRONTEND_URL}/auth/login`
+                    loginUrl: `${process.env.FRONTEND_URL}/auth/login`,
+                    verificationUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`
                 }
             });
         } catch (emailError) {
@@ -608,7 +731,7 @@ router.post('/approve-user', [
 
         res.json({
             success: true,
-            message: 'User approved successfully',
+            message: 'Customer approved successfully and account created',
             user: {
                 id: user._id,
                 username: user.username,
@@ -616,15 +739,16 @@ router.post('/approve-user', [
                 fullName: user.fullName,
                 role: user.role,
                 isApproved: user.isApproved,
+                isActive: user.isActive,
                 createdAt: user.createdAt
             }
         });
     } catch (error) {
-        logger.error('Error approving user:', error);
+        logger.error('Error approving customer:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to approve user',
-            errorType: 'USER_APPROVAL_ERROR'
+            error: 'Failed to approve customer',
+            errorType: 'CUSTOMER_APPROVAL_ERROR'
         });
     }
 });
@@ -646,34 +770,27 @@ router.post('/reject-user', [
 
         const { userId, reason = 'No reason provided' } = req.body;
 
-        const user = await User.findById(userId);
-        if (!user) {
+        // Find pending customer
+        const pendingCustomer = await PendingCustomer.findById(userId);
+        if (!pendingCustomer) {
             return res.status(404).json({
                 success: false,
-                error: 'User not found',
-                errorType: 'USER_NOT_FOUND'
-            });
-        }
-
-        if (user.isApproved) {
-            return res.status(400).json({
-                success: false,
-                error: 'Cannot reject an approved user',
-                errorType: 'USER_ALREADY_APPROVED'
+                error: 'Pending customer not found',
+                errorType: 'PENDING_CUSTOMER_NOT_FOUND'
             });
         }
 
         // Log the rejection action
-        logger.info(`User ${user.email} rejected by ${req.user.email}. Reason: ${reason}`);
+        logger.info(`Pending customer ${pendingCustomer.email} rejected by ${req.user.email}. Reason: ${reason}`);
 
         // Send rejection notification email
         try {
             await sendEmail({
-                to: user.email,
+                to: pendingCustomer.email,
                 subject: 'Account Registration Update - ToolLink',
                 template: 'account-rejected',
                 data: {
-                    fullName: user.fullName,
+                    fullName: pendingCustomer.fullName,
                     reason: reason,
                     supportEmail: process.env.SUPPORT_EMAIL || 'support@toollink.com'
                 }
@@ -682,19 +799,47 @@ router.post('/reject-user', [
             logger.error('Failed to send rejection email:', emailError);
         }
 
-        // Delete the rejected user
-        await User.findByIdAndDelete(userId);
+        // Delete the pending customer
+        await PendingCustomer.findByIdAndDelete(userId);
 
         res.json({
             success: true,
-            message: 'User rejected and removed successfully'
+            message: 'Customer registration rejected and removed successfully'
         });
     } catch (error) {
-        logger.error('Error rejecting user:', error);
+        logger.error('Error rejecting customer:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to reject user',
-            errorType: 'USER_REJECTION_ERROR'
+            error: 'Failed to reject customer',
+            errorType: 'CUSTOMER_REJECTION_ERROR'
+        });
+    }
+});
+
+// Get pending customer details by ID
+router.get('/pending-customer/:id', authenticateToken, requireRole(['admin', 'cashier']), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const pendingCustomer = await PendingCustomer.findById(id).select('-password');
+        if (!pendingCustomer) {
+            return res.status(404).json({
+                success: false,
+                error: 'Pending customer not found',
+                errorType: 'PENDING_CUSTOMER_NOT_FOUND'
+            });
+        }
+
+        res.json({
+            success: true,
+            customer: pendingCustomer
+        });
+    } catch (error) {
+        logger.error('Error fetching pending customer details:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch customer details',
+            errorType: 'FETCH_CUSTOMER_DETAILS_ERROR'
         });
     }
 });

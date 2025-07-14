@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Customer Approval Workflow Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .info {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+            margin: 15px 0;
+        }
+
+        .workflow-highlight {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #ffc107;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+
+        .form-group {
+            margin: 15px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="password"],
+        input[type="tel"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #28a745;
+            margin: 15px 0;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #dc3545;
+            margin: 15px 0;
+        }
+
+        .pending-customer {
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #f8f9fa;
+        }
+
+        .pending-customer h4 {
+            margin: 0 0 10px 0;
+            color: #495057;
+        }
+
+        .customer-actions {
+            margin-top: 10px;
+        }
+
+        .approve-btn {
+            background: #28a745;
+            margin-right: 10px;
+        }
+
+        .approve-btn:hover {
+            background: #218838;
+        }
+
+        .reject-btn {
+            background: #dc3545;
+        }
+
+        .reject-btn:hover {
+            background: #c82333;
+        }
+
+        .loading {
+            display: none;
+            color: #007bff;
+            font-style: italic;
+        }
+
+        .step-indicator {
+            background: #17a2b8;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .new-workflow {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔄 New Customer Approval Workflow</h1>
+        <div class="new-workflow">
+            <h3>✨ Enhanced Customer Approval System</h3>
+            <p><strong>Key Change:</strong> Customer details are NOT saved to the Users database before approval!</p>
+            <p>They are stored in a separate PendingCustomer collection until approved.</p>
+        </div>
+
+        <div class="workflow-highlight">
+            <strong>New Workflow:</strong><br>
+            1. Customer registers → Saved to <strong>PendingCustomer collection</strong> (NOT Users database)<br>
+            2. Customer CANNOT login → Not in Users database yet<br>
+            3. Admin/Cashier approves → Customer moved from PendingCustomer to Users database<br>
+            4. Customer can now login → Now exists in Users database
+        </div>
+    </div>
+
+    <!-- Step 1: Customer Registration -->
+    <div class="container">
+        <div class="step-indicator">Step 1</div>
+        <h2>Customer Registration (Saves to PendingCustomer Collection)</h2>
+        <div class="info">
+            Register as a customer. Your details will be saved to a temporary PendingCustomer collection,
+            NOT the main Users database until approved.
+        </div>
+
+        <form id="registrationForm">
+            <div class="form-group">
+                <label for="fullName">Full Name:</label>
+                <input type="text" id="fullName" required placeholder="John Doe">
+            </div>
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" required placeholder="johndoe123">
+            </div>
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" required placeholder="john@example.com">
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone:</label>
+                <input type="tel" id="phone" placeholder="+94-77-123-4567">
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" required placeholder="minimum 6 characters">
+            </div>
+            <button type="submit" id="registerBtn">Register Customer</button>
+            <div class="loading" id="registrationLoading">Submitting registration...</div>
+        </form>
+        <div id="registrationResult"></div>
+    </div>
+
+    <!-- Step 2: Try Customer Login (Should Fail) -->
+    <div class="container">
+        <div class="step-indicator">Step 2</div>
+        <h2>Try Customer Login (Should Fail - Not in Users Database)</h2>
+        <div class="info">
+            Try to login with the customer credentials. This should fail because the customer
+            is not yet in the main Users database - only in PendingCustomer collection.
+        </div>
+
+        <div class="form-group">
+            <label for="customerEmail">Customer Email:</label>
+            <input type="email" id="customerEmail" placeholder="Will be filled from registration">
+        </div>
+        <div class="form-group">
+            <label for="customerPassword">Customer Password:</label>
+            <input type="password" id="customerPassword" placeholder="Will be filled from registration">
+        </div>
+        <button onclick="customerLogin()" id="customerLoginBtn">Try Customer Login</button>
+        <div class="loading" id="customerLoading">Attempting login...</div>
+        <div id="customerLoginResult"></div>
+    </div>
+
+    <!-- Step 3: Admin Login -->
+    <div class="container">
+        <div class="step-indicator">Step 3</div>
+        <h2>Admin/Cashier Login</h2>
+        <div class="info">
+            Login as admin or cashier to approve pending customers from the PendingCustomer collection.
+        </div>
+
+        <div class="form-group">
+            <label for="adminEmail">Admin/Cashier Email:</label>
+            <input type="email" id="adminEmail" value="admin@toollink.com" placeholder="admin@toollink.com">
+        </div>
+        <div class="form-group">
+            <label for="adminPassword">Password:</label>
+            <input type="password" id="adminPassword" value="admin123" placeholder="admin123">
+        </div>
+        <button onclick="adminLogin()" id="adminLoginBtn">Login as Admin/Cashier</button>
+        <div class="loading" id="adminLoading">Logging in...</div>
+        <div id="adminLoginResult"></div>
+    </div>
+
+    <!-- Step 4: View Pending Customers -->
+    <div class="container">
+        <div class="step-indicator">Step 4</div>
+        <h2>View Pending Customers (From PendingCustomer Collection)</h2>
+        <div class="info">
+            View customers waiting for approval. These are stored in the PendingCustomer collection,
+            not the main Users database.
+        </div>
+
+        <button onclick="loadPendingCustomers()" id="loadPendingBtn" disabled>Load Pending Customers</button>
+        <div class="loading" id="pendingLoading">Loading pending customers...</div>
+        <div id="pendingCustomers"></div>
+    </div>
+
+    <!-- Step 5: Customer Login After Approval -->
+    <div class="container">
+        <div class="step-indicator">Step 5</div>
+        <h2>Customer Login After Approval (Now in Users Database)</h2>
+        <div class="info">
+            After approval, the customer should be able to login because they are now in the main Users database.
+        </div>
+
+        <button onclick="customerLoginAfterApproval()" id="finalLoginBtn" disabled>Try Customer Login Again</button>
+        <div class="loading" id="finalLoading">Attempting login...</div>
+        <div id="finalLoginResult"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api/auth';
+        let adminToken = null;
+        let lastRegisteredCustomer = null;
+
+        // Customer Registration
+        document.getElementById('registrationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const registerBtn = document.getElementById('registerBtn');
+            const loading = document.getElementById('registrationLoading');
+            const resultDiv = document.getElementById('registrationResult');
+
+            registerBtn.disabled = true;
+            loading.style.display = 'block';
+            resultDiv.innerHTML = '';
+
+            const registrationData = {
+                fullName: document.getElementById('fullName').value,
+                username: document.getElementById('username').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                password: document.getElementById('password').value,
+                role: 'customer'
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(registrationData)
+                });
+
+                const data = await response.json();
+                console.log('Registration response:', data);
+
+                if (data.success) {
+                    lastRegisteredCustomer = {
+                        email: registrationData.email,
+                        password: registrationData.password
+                    };
+
+                    // Fill customer login form
+                    document.getElementById('customerEmail').value = registrationData.email;
+                    document.getElementById('customerPassword').value = registrationData.password;
+
+                    if (data.requiresApproval) {
+                        resultDiv.innerHTML = `
+                            <div class="success">
+                                ✅ Customer registration submitted successfully!<br>
+                                📋 <strong>Status:</strong> ${data.status}<br>
+                                📧 <strong>Email:</strong> ${registrationData.email}<br>
+                                🏛️ <strong>Storage:</strong> Saved to PendingCustomer collection (NOT Users database)<br>
+                                ⏳ <strong>Note:</strong> Customer cannot login until approved and moved to Users database
+                            </div>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <div class="success">
+                                ✅ User registered and saved to Users database!<br>
+                                📧 <strong>Email:</strong> ${registrationData.email}
+                            </div>
+                        `;
+                    }
+                } else {
+                    let errorMessage = data.error || 'Unknown error';
+                    let detailsHtml = '';
+
+                    if (data.details && Array.isArray(data.details)) {
+                        detailsHtml = '<br><strong>Validation Details:</strong><ul>';
+                        data.details.forEach(detail => {
+                            detailsHtml += `<li><strong>${detail.param}:</strong> ${detail.msg}</li>`;
+                        });
+                        detailsHtml += '</ul>';
+                    }
+
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ Registration failed: ${errorMessage}${detailsHtml}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Network error: ${error.message}
+                    </div>
+                `;
+            } finally {
+                registerBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        });
+
+        // Customer Login (should fail)
+        async function customerLogin() {
+            const customerLoginBtn = document.getElementById('customerLoginBtn');
+            const loading = document.getElementById('customerLoading');
+            const resultDiv = document.getElementById('customerLoginResult');
+
+            customerLoginBtn.disabled = true;
+            loading.style.display = 'block';
+            resultDiv.innerHTML = '';
+
+            const email = document.getElementById('customerEmail').value;
+            const password = document.getElementById('customerPassword').value;
+
+            if (!email || !password) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Please register a customer first or fill in the credentials
+                    </div>
+                `;
+                customerLoginBtn.disabled = false;
+                loading.style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                console.log('Customer login response:', data);
+
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ ERROR: Customer login succeeded (this should NOT happen!)<br>
+                            Customer should not be in Users database yet!
+                        </div>
+                    `;
+                } else {
+                    if (data.errorType === 'ACCOUNT_PENDING_APPROVAL') {
+                        resultDiv.innerHTML = `
+                            <div class="success">
+                                ✅ Customer login correctly blocked!<br>
+                                📋 <strong>Reason:</strong> Account pending approval<br>
+                                🏛️ <strong>Explanation:</strong> Customer not in Users database yet<br>
+                                📝 <strong>Message:</strong> ${data.error}
+                            </div>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <div class="error">
+                                ❌ Unexpected error: ${data.error}
+                            </div>
+                        `;
+                    }
+                }
+            } catch (error) {
+                console.error('Customer login error:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Network error: ${error.message}
+                    </div>
+                `;
+            } finally {
+                customerLoginBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        // Admin Login
+        async function adminLogin() {
+            const adminLoginBtn = document.getElementById('adminLoginBtn');
+            const loading = document.getElementById('adminLoading');
+            const resultDiv = document.getElementById('adminLoginResult');
+            const loadPendingBtn = document.getElementById('loadPendingBtn');
+
+            adminLoginBtn.disabled = true;
+            loading.style.display = 'block';
+            resultDiv.innerHTML = '';
+
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                console.log('Admin login response:', data);
+
+                if (data.success) {
+                    adminToken = data.accessToken;
+                    loadPendingBtn.disabled = false;
+
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Admin login successful!<br>
+                            👤 <strong>User:</strong> ${data.user.fullName}<br>
+                            🔑 <strong>Role:</strong> ${data.user.role}<br>
+                            🎫 <strong>Token:</strong> ${data.accessToken.substring(0, 20)}...
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ Admin login failed: ${data.error || 'Unknown error'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Admin login error:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Network error: ${error.message}
+                    </div>
+                `;
+            } finally {
+                adminLoginBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        // Load Pending Customers
+        async function loadPendingCustomers() {
+            if (!adminToken) {
+                alert('Please login as admin/cashier first');
+                return;
+            }
+
+            const loading = document.getElementById('pendingLoading');
+            const resultDiv = document.getElementById('pendingCustomers');
+
+            loading.style.display = 'block';
+            resultDiv.innerHTML = '';
+
+            try {
+                const response = await fetch(`${API_BASE}/pending-users`, {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                console.log('Pending customers response:', data);
+
+                if (data.success && data.users) {
+                    if (data.users.length === 0) {
+                        resultDiv.innerHTML = `
+                            <div class="info">
+                                📋 No pending customers found in PendingCustomer collection.<br>
+                                Try registering a customer first.
+                            </div>
+                        `;
+                    } else {
+                        let html = `
+                            <div class="success">
+                                ✅ Found ${data.users.length} pending customer(s) in PendingCustomer collection
+                            </div>
+                        `;
+
+                        data.users.forEach(customer => {
+                            html += `
+                                <div class="pending-customer">
+                                    <h4>👤 ${customer.fullName}</h4>
+                                    <p><strong>📧 Email:</strong> ${customer.email}</p>
+                                    <p><strong>📱 Phone:</strong> ${customer.phone || 'Not provided'}</p>
+                                    <p><strong>📅 Submitted:</strong> ${new Date(customer.submittedAt).toLocaleString()}</p>
+                                    <p><strong>📊 Status:</strong> ${customer.status}</p>
+                                    <p><strong>🏛️ Collection:</strong> PendingCustomer (NOT Users database)</p>
+                                    <div class="customer-actions">
+                                        <button class="approve-btn" onclick="approveCustomer('${customer._id}', '${customer.email}')">
+                                            ✅ Approve (Move to Users DB)
+                                        </button>
+                                        <button class="reject-btn" onclick="rejectCustomer('${customer._id}', '${customer.email}')">
+                                            ❌ Reject (Remove from PendingCustomer)
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        });
+
+                        resultDiv.innerHTML = html;
+                    }
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ Failed to load pending customers: ${data.error || 'Unknown error'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Load pending customers error:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Network error: ${error.message}
+                    </div>
+                `;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // Approve Customer
+        async function approveCustomer(userId, email) {
+            if (!adminToken) {
+                alert('Please login as admin/cashier first');
+                return;
+            }
+
+            try {
+                console.log('Approving customer:', userId);
+
+                const response = await fetch(`${API_BASE}/approve-user`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ userId })
+                });
+
+                const data = await response.json();
+                console.log('Approve response:', data);
+
+                if (data.success) {
+                    alert(`✅ Customer ${email} approved successfully!\n\n🔄 Customer moved from PendingCustomer collection to Users database!\n\n👤 User ID in Users database: ${data.user.id}`);
+                    loadPendingCustomers(); // Refresh the list
+                    document.getElementById('finalLoginBtn').disabled = false; // Enable final login test
+                } else {
+                    alert(`❌ Failed to approve customer: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Approve customer error:', error);
+                alert(`❌ Error approving customer: ${error.message}`);
+            }
+        }
+
+        // Reject Customer
+        async function rejectCustomer(userId, email) {
+            if (!adminToken) {
+                alert('Please login as admin/cashier first');
+                return;
+            }
+
+            const reason = prompt('Enter rejection reason (optional):');
+
+            try {
+                console.log('Rejecting customer:', userId, 'Reason:', reason);
+
+                const response = await fetch(`${API_BASE}/reject-user`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        reason: reason || 'No reason provided'
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Reject response:', data);
+
+                if (data.success) {
+                    alert(`✅ Customer ${email} rejected and removed from PendingCustomer collection!`);
+                    loadPendingCustomers(); // Refresh the list
+                } else {
+                    alert(`❌ Failed to reject customer: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Reject customer error:', error);
+                alert(`❌ Error rejecting customer: ${error.message}`);
+            }
+        }
+
+        // Customer Login After Approval
+        async function customerLoginAfterApproval() {
+            const finalLoginBtn = document.getElementById('finalLoginBtn');
+            const loading = document.getElementById('finalLoading');
+            const resultDiv = document.getElementById('finalLoginResult');
+
+            finalLoginBtn.disabled = true;
+            loading.style.display = 'block';
+            resultDiv.innerHTML = '';
+
+            const email = document.getElementById('customerEmail').value;
+            const password = document.getElementById('customerPassword').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                console.log('Final customer login response:', data);
+
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Customer login successful after approval!<br>
+                            👤 <strong>User:</strong> ${data.user.fullName}<br>
+                            📧 <strong>Email:</strong> ${data.user.email}<br>
+                            🔑 <strong>Role:</strong> ${data.user.role}<br>
+                            ✅ <strong>Approved:</strong> ${data.user.isApproved}<br>
+                            🏛️ <strong>Database:</strong> Now in Users database<br>
+                            🎉 <strong>Access:</strong> Full system access granted!
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ Customer login failed: ${data.error}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Final customer login error:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Network error: ${error.message}
+                    </div>
+                `;
+            } finally {
+                finalLoginBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+
+</html>

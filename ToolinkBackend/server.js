@@ -41,7 +41,7 @@ const __dirname = path.dirname(__filename);
 config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000; // Server port
 
 // Security middleware
 app.use(helmet({
@@ -183,4 +183,4 @@ process.on('SIGINT', () => {
 });
 
 export default app;
- 
+

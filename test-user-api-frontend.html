@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management API Test</title>
+</head>
+
+<body>
+    <h1>User Management API Test</h1>
+    <button onclick="testUsersAPI()">Test Users API</button>
+    <div id="results"></div>
+
+    <script>
+        async function testUsersAPI() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = 'Testing...';
+
+            try {
+                // First, try to get authentication token
+                const loginResponse = await fetch('http://localhost:3000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@toollink.com',
+                        password: 'admin123' // Default admin password
+                    })
+                });
+
+                const loginData = await loginResponse.json();
+                console.log('Login response:', loginData);
+
+                if (loginData.success && loginData.token) {
+                    // Now test the users API
+                    const usersResponse = await fetch('http://localhost:3000/api/users?limit=1000', {
+                        headers: {
+                            'Authorization': `Bearer ${loginData.token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const usersData = await usersResponse.json();
+                    console.log('Users API response:', usersData);
+
+                    resultsDiv.innerHTML = `
+                        <h2>API Test Results:</h2>
+                        <h3>Login Status: ${loginResponse.status}</h3>
+                        <h3>Users API Status: ${usersResponse.status}</h3>
+                        <h3>Users Found: ${usersData.data ? usersData.data.length : 0}</h3>
+                        <pre>${JSON.stringify(usersData, null, 2)}</pre>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <h2>Login Failed:</h2>
+                        <pre>${JSON.stringify(loginData, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultsDiv.innerHTML = `
+                    <h2>Error:</h2>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+    </script>
+</body>
+
+</html>

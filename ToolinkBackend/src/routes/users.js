@@ -19,10 +19,8 @@ router.get('/', adminOnly, async (req, res) => {
             sort = 'fullName'
         } = req.query;
 
-        const filter = {
-            deletedAt: null,
-            isApproved: true  // Only show approved users in user management
-        };
+        const filter = {};
+        // No deletedAt filter needed since we're using hard delete
 
         if (role) {
             filter.role = role;
@@ -445,13 +443,10 @@ router.delete('/:id', adminOnly, async (req, res) => {
             });
         }
 
-        // Soft delete
-        user.deletedAt = new Date();
-        user.isActive = false;
-        user.updatedBy = req.user._id;
-        await user.save();
+        // Hard delete - permanently remove from database
+        await User.findByIdAndDelete(req.params.id);
 
-        logger.info(`User deleted: ${user.email} by ${req.user.fullName}`);
+        logger.info(`User permanently deleted from database: ${user.email} by ${req.user.fullName}`);
 
         res.json({
             success: true,
@@ -492,8 +487,7 @@ router.get('/role/:role', authorize('admin', 'cashier', 'warehouse'), async (req
         const users = await User.find({
             role,
             isActive: true,
-            isApproved: true,
-            deletedAt: null
+            isApproved: true
         }).select('fullName username email phone role createdAt')
             .sort({ fullName: 1 });
 
@@ -565,10 +559,8 @@ router.post('/bulk', adminOnly, async (req, res) => {
                         break;
 
                     case 'delete':
-                        user.deletedAt = new Date();
-                        user.isActive = false;
-                        user.updatedBy = req.user._id;
-                        result = await user.save();
+                        // Hard delete - permanently remove from database
+                        result = await User.findByIdAndDelete(userId);
                         break;
 
                     case 'update':

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -31,7 +32,7 @@
             border-radius: 15px;
             margin-bottom: 30px;
             text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
         }
 
         .header h1 {
@@ -56,7 +57,7 @@
             background: white;
             padding: 25px;
             border-radius: 12px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             text-align: center;
             transition: transform 0.3s ease;
         }
@@ -88,7 +89,7 @@
             background: white;
             padding: 25px;
             border-radius: 12px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             margin-bottom: 30px;
             display: flex;
             flex-wrap: wrap;
@@ -147,7 +148,7 @@
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102,126,234,0.4);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
         .btn-success {
@@ -157,7 +158,7 @@
 
         .btn-success:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(79,172,254,0.4);
+            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
         }
 
         .btn-danger {
@@ -167,7 +168,7 @@
 
         .btn-danger:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255,65,108,0.4);
+            box-shadow: 0 5px 15px rgba(255, 65, 108, 0.4);
         }
 
         .btn-warning {
@@ -183,7 +184,7 @@
         .inventory-container {
             background: white;
             border-radius: 12px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             overflow: hidden;
         }
 
@@ -298,7 +299,7 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.5);
+            background-color: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(5px);
         }
 
@@ -309,13 +310,20 @@
             border-radius: 15px;
             width: 90%;
             max-width: 600px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             animation: modalSlideIn 0.3s ease;
         }
 
         @keyframes modalSlideIn {
-            from { transform: translateY(-50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
 
         .modal-header {
@@ -378,6 +386,35 @@
         .form-group textarea:focus {
             outline: none;
             border-color: #667eea;
+        }
+
+        /* Connected fields styling for category-quantity-unit relationship */
+        .connected-field {
+            border-color: #667eea !important;
+            background-color: #f8f9ff !important;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .category-connected {
+            position: relative;
+        }
+
+        .category-connected::after {
+            content: '🔗';
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+            opacity: 0.7;
+        }
+
+        .connection-indicator {
+            font-size: 0.8em;
+            color: #667eea;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .form-row {
@@ -443,6 +480,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <!-- Header -->
@@ -591,12 +629,14 @@
 
                     <div class="form-group">
                         <label for="itemDescription">Description</label>
-                        <textarea id="itemDescription" rows="3" placeholder="Enter item description (optional)"></textarea>
+                        <textarea id="itemDescription" rows="3"
+                            placeholder="Enter item description (optional)"></textarea>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn" onclick="closeModal()" style="background: #6c757d; color: white; margin-right: 10px;">Cancel</button>
+                <button type="button" class="btn" onclick="closeModal()"
+                    style="background: #6c757d; color: white; margin-right: 10px;">Cancel</button>
                 <button type="submit" form="itemForm" class="btn btn-primary" id="saveButton">💾 Save Item</button>
             </div>
         </div>
@@ -630,6 +670,100 @@
                     currentPage = 1;
                     loadInventory();
                 }, 500);
+            });
+
+            // Category change handler - connects Category with Quantity and Unit
+            document.getElementById('itemCategory').addEventListener('change', (e) => {
+                const category = e.target.value;
+                const quantityField = document.getElementById('itemQuantity');
+                const unitField = document.getElementById('itemUnit');
+
+                // Clear existing options and reset
+                unitField.innerHTML = '<option value="">Select Unit</option>';
+                quantityField.value = '';
+
+                // Category-specific units and default quantities
+                const categoryMappings = {
+                    'Tools': {
+                        units: ['pieces', 'sets', 'units'],
+                        defaultQuantity: 1,
+                        label: '🔧'
+                    },
+                    'Hardware': {
+                        units: ['pieces', 'boxes', 'kg', 'units'],
+                        defaultQuantity: 10,
+                        label: '🔩'
+                    },
+                    'Materials': {
+                        units: ['kg', 'liters', 'meters', 'sheets', 'rolls'],
+                        defaultQuantity: 50,
+                        label: '🧱'
+                    },
+                    'Equipment': {
+                        units: ['pieces', 'units', 'sets'],
+                        defaultQuantity: 1,
+                        label: '⚙️'
+                    },
+                    'Safety': {
+                        units: ['pieces', 'pairs', 'sets', 'boxes'],
+                        defaultQuantity: 5,
+                        label: '🦺'
+                    },
+                    'Electrical': {
+                        units: ['pieces', 'meters', 'rolls', 'boxes'],
+                        defaultQuantity: 20,
+                        label: '⚡'
+                    },
+                    'Plumbing': {
+                        units: ['pieces', 'meters', 'liters', 'sets'],
+                        defaultQuantity: 15,
+                        label: '🚰'
+                    },
+                    'Other': {
+                        units: ['pieces', 'kg', 'liters', 'meters', 'boxes', 'sets', 'pairs', 'rolls', 'sheets', 'units'],
+                        defaultQuantity: 0,
+                        label: '📦'
+                    }
+                };
+
+                if (category && categoryMappings[category]) {
+                    const mapping = categoryMappings[category];
+
+                    // Populate relevant units for the selected category
+                    mapping.units.forEach(unit => {
+                        const option = document.createElement('option');
+                        option.value = unit;
+                        option.textContent = unit.charAt(0).toUpperCase() + unit.slice(1);
+                        unitField.appendChild(option);
+                    });
+
+                    // Set default quantity with visual indicator
+                    quantityField.value = mapping.defaultQuantity;
+                    quantityField.style.borderColor = '#667eea';
+                    quantityField.style.backgroundColor = '#f8f9ff';
+
+                    // Auto-select the most common unit for the category
+                    if (mapping.units.length > 0) {
+                        unitField.value = mapping.units[0];
+                        unitField.style.borderColor = '#667eea';
+                        unitField.style.backgroundColor = '#f8f9ff';
+                    }
+
+                    // Visual feedback
+                    const categoryLabel = document.querySelector('label[for="itemCategory"]');
+                    categoryLabel.innerHTML = `Category * ${mapping.label}`;
+
+                    // Show connection indicator
+                    showCategoryConnection(category, mapping.defaultQuantity);
+                } else {
+                    // Reset to default if no category selected
+                    const categoryLabel = document.querySelector('label[for="itemCategory"]');
+                    categoryLabel.innerHTML = 'Category *';
+                    quantityField.style.borderColor = '';
+                    quantityField.style.backgroundColor = '';
+                    unitField.style.borderColor = '';
+                    unitField.style.backgroundColor = '';
+                }
             });
 
             // Filter changes
@@ -871,7 +1005,45 @@
             document.getElementById('modalTitle').textContent = '➕ Add New Item';
             document.getElementById('saveButton').textContent = '💾 Save Item';
             document.getElementById('itemForm').reset();
+
+            // Reset connected field styling and labels
+            resetConnectedFields();
+
             document.getElementById('itemModal').style.display = 'block';
+        }
+
+        // Reset connected field styling and labels
+        function resetConnectedFields() {
+            // Reset labels to original state
+            document.querySelector('label[for="itemCategory"]').innerHTML = 'Category *';
+            document.querySelector('label[for="itemQuantity"]').innerHTML = 'Initial Quantity *';
+            document.querySelector('label[for="itemUnit"]').innerHTML = 'Unit *';
+
+            // Reset field styling
+            const fields = ['itemCategory', 'itemQuantity', 'itemUnit'];
+            fields.forEach(fieldId => {
+                const field = document.getElementById(fieldId);
+                field.style.borderColor = '';
+                field.style.backgroundColor = '';
+                field.style.transform = '';
+                field.classList.remove('connected-field');
+            });
+
+            // Reset unit options to default
+            const unitField = document.getElementById('itemUnit');
+            unitField.innerHTML = `
+                <option value="">Select Unit</option>
+                <option value="pieces">Pieces</option>
+                <option value="kg">Kilograms</option>
+                <option value="liters">Liters</option>
+                <option value="meters">Meters</option>
+                <option value="boxes">Boxes</option>
+                <option value="sets">Sets</option>
+                <option value="pairs">Pairs</option>
+                <option value="rolls">Rolls</option>
+                <option value="sheets">Sheets</option>
+                <option value="units">Units</option>
+            `;
         }
 
         // Edit item
@@ -885,10 +1057,10 @@
                 if (data.success) {
                     const item = data.data;
                     editingItemId = itemId;
-                    
+
                     document.getElementById('modalTitle').textContent = '✏️ Edit Item';
                     document.getElementById('saveButton').textContent = '💾 Update Item';
-                    
+
                     // Populate form
                     document.getElementById('itemName').value = item.name;
                     document.getElementById('itemSku').value = item.sku;
@@ -899,7 +1071,11 @@
                     document.getElementById('itemPrice').value = item.unit_price || item.unitPrice || 0;
                     document.getElementById('itemLocation').value = item.location;
                     document.getElementById('itemDescription').value = item.description || '';
-                    
+
+                    // Trigger category connection for editing
+                    const categoryEvent = new Event('change');
+                    document.getElementById('itemCategory').dispatchEvent(categoryEvent);
+
                     document.getElementById('itemModal').style.display = 'block';
                 } else {
                     showAlert('Failed to load item details', 'error');
@@ -984,6 +1160,9 @@
         function closeModal() {
             document.getElementById('itemModal').style.display = 'none';
             editingItemId = null;
+
+            // Reset connected fields when closing
+            resetConnectedFields();
         }
 
         // Show alert
@@ -1005,6 +1184,29 @@
             // Scroll to top to show alert
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+
+        // Show category connection visual feedback
+        function showCategoryConnection(category, defaultQty) {
+            const quantityLabel = document.querySelector('label[for="itemQuantity"]');
+            const unitLabel = document.querySelector('label[for="itemUnit"]');
+
+            // Add visual indicators showing the connection
+            quantityLabel.innerHTML = `Initial Quantity * <span style="color: #667eea; font-weight: bold;">${defaultQty}</span>`;
+            unitLabel.innerHTML = `Unit * <span style="color: #667eea; font-size: 0.8em;">(${category})</span>`;
+
+            // Add a subtle animation
+            const quantityField = document.getElementById('itemQuantity');
+            const unitField = document.getElementById('itemUnit');
+
+            [quantityField, unitField].forEach(field => {
+                field.style.transition = 'all 0.3s ease';
+                field.style.transform = 'scale(1.02)';
+                setTimeout(() => {
+                    field.style.transform = 'scale(1)';
+                }, 200);
+            });
+        }
     </script>
 </body>
+
 </html>

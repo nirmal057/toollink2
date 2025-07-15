@@ -1,7 +1,7 @@
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 import Inventory from '../models/Inventory.js';
-import { authorize } from '../middleware/auth.js';
+import { authorize, authenticateToken } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -133,7 +133,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create inventory item
-router.post('/', authorize('admin', 'warehouse'), inventoryValidation, async (req, res) => {
+router.post('/', authenticateToken, authorize('admin', 'warehouse'), inventoryValidation, async (req, res) => {
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -184,7 +184,7 @@ router.post('/', authorize('admin', 'warehouse'), inventoryValidation, async (re
 });
 
 // Update inventory item
-router.put('/:id', authorize('admin', 'warehouse'), async (req, res) => {
+router.put('/:id', authenticateToken, authorize('admin', 'warehouse'), async (req, res) => {
     try {
         const item = await Inventory.findById(req.params.id);
 
@@ -308,7 +308,7 @@ router.patch('/:id/quantity', authorize('admin', 'warehouse'), async (req, res) 
 });
 
 // Delete inventory item (permanent deletion)
-router.delete('/:id', authorize('admin', 'warehouse'), async (req, res) => {
+router.delete('/:id', authenticateToken, authorize('admin', 'warehouse'), async (req, res) => {
     try {
         const item = await Inventory.findById(req.params.id);
 
@@ -394,7 +394,7 @@ router.get('/locations', async (req, res) => {
 });
 
 // Bulk operations
-router.post('/bulk', authorize('admin', 'warehouse'), async (req, res) => {
+router.post('/bulk', authenticateToken, authorize('admin', 'warehouse'), async (req, res) => {
     try {
         const { operation, items } = req.body;
 

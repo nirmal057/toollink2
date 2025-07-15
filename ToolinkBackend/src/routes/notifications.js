@@ -4,77 +4,98 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// Mock notification data
+// Mock notification data - Updated to match frontend expectations
 const mockNotifications = [
     {
-        id: '1',
+        _id: '1',
         userId: null, // System notification
-        type: 'system',
+        type: 'info',
+        category: 'system',
         title: 'System Maintenance',
         message: 'Scheduled maintenance will occur tonight at 2 AM',
-        priority: 'medium',
-        read: false,
-        createdAt: new Date().toISOString()
+        priority: 'normal',
+        status: 'sent',
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        recipient: { specific: false },
+        sender: { system: true, name: 'System' },
+        isArchived: false
     },
     {
-        id: '2',
+        _id: '2',
         userId: null,
-        type: 'inventory',
+        type: 'warning',
+        category: 'inventory',
         title: 'Low Stock Alert',
         message: 'Tool A is running low on stock (5 remaining)',
         priority: 'high',
-        read: false,
-        createdAt: new Date().toISOString()
+        status: 'sent',
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        recipient: { specific: false },
+        sender: { system: true, name: 'Inventory System' },
+        isArchived: false
     },
     {
-        id: '3',
+        _id: '3',
         userId: null,
-        type: 'order',
+        type: 'info',
+        category: 'order',
         title: 'New Order Received',
         message: 'Order ORD-001 has been placed and needs approval',
-        priority: 'medium',
-        read: false,
-        createdAt: new Date().toISOString()
+        priority: 'normal',
+        status: 'sent',
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        recipient: { specific: false },
+        sender: { system: true, name: 'Order System' },
+        isArchived: false
     }
 ];
 
 // Get all notifications for user
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const { type, priority, read, page = 1, limit = 20 } = req.query;
+        const { category, priority, unreadOnly, page = 1, limit = 20 } = req.query;
 
         let filteredNotifications = mockNotifications.filter(n =>
             n.userId === null || n.userId === req.user._id.toString()
         );
 
-        if (type) {
-            filteredNotifications = filteredNotifications.filter(n => n.type === type);
+        if (category) {
+            filteredNotifications = filteredNotifications.filter(n => n.category === category);
         }
 
         if (priority) {
             filteredNotifications = filteredNotifications.filter(n => n.priority === priority);
         }
 
-        if (read !== undefined) {
-            filteredNotifications = filteredNotifications.filter(n => n.read === (read === 'true'));
+        if (unreadOnly === 'true') {
+            filteredNotifications = filteredNotifications.filter(n => !n.isRead);
         }
 
         // Sort by creation date (newest first)
         filteredNotifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
+        // Count unread notifications
+        const unreadCount = filteredNotifications.filter(n => !n.isRead).length;
+
         // Pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const paginatedNotifications = filteredNotifications.slice(skip, skip + parseInt(limit));
+        const totalPages = Math.ceil(filteredNotifications.length / parseInt(limit));
 
         res.json({
             success: true,
-            data: paginatedNotifications,
+            notifications: paginatedNotifications,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
-                total: filteredNotifications.length,
-                pages: Math.ceil(filteredNotifications.length / parseInt(limit))
-            }
+                currentPage: parseInt(page),
+                totalPages: totalPages,
+                totalCount: filteredNotifications.length,
+                hasNext: parseInt(page) < totalPages,
+                hasPrev: parseInt(page) > 1
+            },
+            unreadCount: unreadCount
         });
     } catch (error) {
         logger.error('Get notifications error:', error);
@@ -87,7 +108,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Get notification statistics
-router.get('/stats', async (req, res) => {
+router.get('/stats', authenticateToken, async (req, res) => {
     try {
         const userNotifications = mockNotifications.filter(n =>
             n.userId === null || n.userId === req.user._id.toString()
@@ -95,17 +116,17 @@ router.get('/stats', async (req, res) => {
 
         const stats = {
             total: userNotifications.length,
-            unread: userNotifications.filter(n => !n.read).length,
-            read: userNotifications.filter(n => n.read).length,
-            byType: {
-                system: userNotifications.filter(n => n.type === 'system').length,
-                inventory: userNotifications.filter(n => n.type === 'inventory').length,
-                order: userNotifications.filter(n => n.type === 'order').length,
-                delivery: userNotifications.filter(n => n.type === 'delivery').length
+            unread: userNotifications.filter(n => !n.isRead).length,
+            read: userNotifications.filter(n => n.isRead).length,
+            byCategory: {
+                system: userNotifications.filter(n => n.category === 'system').length,
+                inventory: userNotifications.filter(n => n.category === 'inventory').length,
+                order: userNotifications.filter(n => n.category === 'order').length,
+                delivery: userNotifications.filter(n => n.category === 'delivery').length
             },
             byPriority: {
                 high: userNotifications.filter(n => n.priority === 'high').length,
-                medium: userNotifications.filter(n => n.priority === 'medium').length,
+                normal: userNotifications.filter(n => n.priority === 'normal').length,
                 low: userNotifications.filter(n => n.priority === 'low').length
             }
         };
@@ -131,7 +152,7 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
             n.userId === null || n.userId === req.user._id.toString()
         );
 
-        const unreadCount = userNotifications.filter(n => !n.read).length;
+        const unreadCount = userNotifications.filter(n => !n.isRead).length;
 
         logger.info(`Unread notifications count: ${unreadCount} for user ${req.user._id}`);
 
@@ -154,7 +175,7 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
 // Get single notification
 router.get('/:id', authenticateToken, async (req, res) => {
     try {
-        const notification = mockNotifications.find(n => n.id === req.params.id);
+        const notification = mockNotifications.find(n => n._id === req.params.id);
 
         if (!notification) {
             return res.status(404).json({
@@ -224,9 +245,9 @@ router.post('/', authorize('admin', 'warehouse', 'cashier'), async (req, res) =>
 });
 
 // Mark notification as read
-router.patch('/:id/read', async (req, res) => {
+router.put('/:id/read', authenticateToken, async (req, res) => {
     try {
-        const notificationIndex = mockNotifications.findIndex(n => n.id === req.params.id);
+        const notificationIndex = mockNotifications.findIndex(n => n._id === req.params.id);
 
         if (notificationIndex === -1) {
             return res.status(404).json({
@@ -247,8 +268,9 @@ router.patch('/:id/read', async (req, res) => {
             });
         }
 
-        mockNotifications[notificationIndex].read = true;
+        mockNotifications[notificationIndex].isRead = true;
         mockNotifications[notificationIndex].readAt = new Date().toISOString();
+        mockNotifications[notificationIndex].status = 'read';
 
         res.json({
             success: true,
@@ -266,15 +288,16 @@ router.patch('/:id/read', async (req, res) => {
 });
 
 // Mark all notifications as read
-router.patch('/read-all', async (req, res) => {
+router.put('/mark-all-read', authenticateToken, async (req, res) => {
     try {
         const now = new Date().toISOString();
         let updatedCount = 0;
 
         mockNotifications.forEach(notification => {
-            if ((notification.userId === null || notification.userId === req.user._id.toString()) && !notification.read) {
-                notification.read = true;
+            if ((notification.userId === null || notification.userId === req.user._id.toString()) && !notification.isRead) {
+                notification.isRead = true;
                 notification.readAt = now;
+                notification.status = 'read';
                 updatedCount++;
             }
         });
@@ -282,7 +305,7 @@ router.patch('/read-all', async (req, res) => {
         res.json({
             success: true,
             message: `${updatedCount} notifications marked as read`,
-            count: updatedCount
+            data: { updatedCount }
         });
     } catch (error) {
         logger.error('Mark all notifications as read error:', error);
@@ -295,9 +318,9 @@ router.patch('/read-all', async (req, res) => {
 });
 
 // Delete notification
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
     try {
-        const notificationIndex = mockNotifications.findIndex(n => n.id === req.params.id);
+        const notificationIndex = mockNotifications.findIndex(n => n._id === req.params.id);
 
         if (notificationIndex === -1) {
             return res.status(404).json({

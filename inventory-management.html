@@ -395,6 +395,62 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
+        /* Auto-detected fields styling */
+        .auto-detected {
+            border-color: #28a745 !important;
+            background-color: #e8f5e8 !important;
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.15);
+            animation: autoFillPulse 1s ease-in-out;
+        }
+
+        @keyframes autoFillPulse {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.02);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .detection-indicator {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            animation: fadeInOut 3s ease-in-out;
+        }
+
+        @keyframes fadeInOut {
+            0% {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            20% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            80% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+        }
+
         .category-connected {
             position: relative;
         }
@@ -670,6 +726,109 @@
                     currentPage = 1;
                     loadInventory();
                 }, 500);
+            });
+
+            // Item name change handler - detects specific items like "cement" and sets defaults
+            let nameTimeout;
+            document.getElementById('itemName').addEventListener('input', (e) => {
+                clearTimeout(nameTimeout);
+                nameTimeout = setTimeout(() => {
+                    const itemName = e.target.value.toLowerCase().trim();
+                    const descriptionField = document.getElementById('itemDescription');
+                    const unitField = document.getElementById('itemUnit');
+                    const quantityField = document.getElementById('itemQuantity');
+                    const categoryField = document.getElementById('itemCategory');
+                    const thresholdField = document.getElementById('itemThreshold');
+
+                    // Define specific item mappings
+                    const itemMappings = {
+                        'cement': {
+                            description: '50kg bags',
+                            unit: 'pieces', // since each piece is a 50kg bag
+                            category: 'Materials',
+                            defaultQuantity: 100,
+                            threshold: 20,
+                            emoji: '🏗️'
+                        },
+                        'concrete': {
+                            description: 'Ready mix concrete bags',
+                            unit: 'kg',
+                            category: 'Materials',
+                            defaultQuantity: 500,
+                            threshold: 50,
+                            emoji: '🏗️'
+                        },
+                        'sand': {
+                            description: 'Construction sand',
+                            unit: 'kg',
+                            category: 'Materials',
+                            defaultQuantity: 1000,
+                            threshold: 100,
+                            emoji: '🏖️'
+                        },
+                        'steel': {
+                            description: 'Steel rods/bars',
+                            unit: 'kg',
+                            category: 'Materials',
+                            defaultQuantity: 500,
+                            threshold: 50,
+                            emoji: '🔩'
+                        },
+                        'paint': {
+                            description: 'Paint buckets/cans',
+                            unit: 'liters',
+                            category: 'Materials',
+                            defaultQuantity: 50,
+                            threshold: 10,
+                            emoji: '🎨'
+                        },
+                        'brick': {
+                            description: 'Building bricks',
+                            unit: 'pieces',
+                            category: 'Materials',
+                            defaultQuantity: 1000,
+                            threshold: 200,
+                            emoji: '🧱'
+                        }
+                    };
+
+                    // Check if the item name matches any predefined items
+                    let matchedItem = null;
+                    for (const [key, mapping] of Object.entries(itemMappings)) {
+                        if (itemName.includes(key)) {
+                            matchedItem = mapping;
+                            break;
+                        }
+                    }
+
+                    if (matchedItem) {
+                        // Auto-fill the form based on the detected item
+                        descriptionField.value = matchedItem.description;
+                        categoryField.value = matchedItem.category;
+                        quantityField.value = matchedItem.defaultQuantity;
+                        thresholdField.value = matchedItem.threshold;
+
+                        // Set the unit
+                        unitField.value = matchedItem.unit;
+
+                        // Add visual feedback
+                        showItemDetection(itemName, matchedItem);
+
+                        // Trigger category change to show connections
+                        const categoryEvent = new Event('change');
+                        categoryField.dispatchEvent(categoryEvent);
+
+                        // Highlight the auto-filled fields
+                        [descriptionField, categoryField, quantityField, unitField, thresholdField].forEach(field => {
+                            field.style.backgroundColor = '#e8f5e8';
+                            field.style.borderColor = '#28a745';
+                            setTimeout(() => {
+                                field.style.backgroundColor = '';
+                                field.style.borderColor = '';
+                            }, 2000);
+                        });
+                    }
+                }, 500); // Debounce for 500ms
             });
 
             // Category change handler - connects Category with Quantity and Unit
@@ -1015,12 +1174,13 @@
         // Reset connected field styling and labels
         function resetConnectedFields() {
             // Reset labels to original state
+            document.querySelector('label[for="itemName"]').innerHTML = 'Item Name *';
             document.querySelector('label[for="itemCategory"]').innerHTML = 'Category *';
             document.querySelector('label[for="itemQuantity"]').innerHTML = 'Initial Quantity *';
             document.querySelector('label[for="itemUnit"]').innerHTML = 'Unit *';
 
             // Reset field styling
-            const fields = ['itemCategory', 'itemQuantity', 'itemUnit'];
+            const fields = ['itemName', 'itemCategory', 'itemQuantity', 'itemUnit', 'itemDescription'];
             fields.forEach(fieldId => {
                 const field = document.getElementById(fieldId);
                 field.style.borderColor = '';
@@ -1183,6 +1343,52 @@
 
             // Scroll to top to show alert
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Authentication
+        async function authenticate() {
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@toollink.com',
+                        password: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.accessToken) {
+                    authToken = data.accessToken;
+                    localStorage.setItem('authToken', authToken);
+                    document.getElementById('userInfo').textContent = `Welcome, ${data.user.fullName}`;
+                    return true;
+                } else {
+                    showAlert('Authentication failed. Please check your credentials.', 'error');
+                    return false;
+                }
+            } catch (error) {
+                showAlert('Authentication error: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        // Show item detection visual feedback
+        function showItemDetection(itemName, itemData) {
+            const nameLabel = document.querySelector('label[for="itemName"]');
+            const originalText = nameLabel.innerHTML;
+
+            // Show detection feedback
+            nameLabel.innerHTML = `Item Name * ${itemData.emoji} <span style="color: #28a745; font-size: 0.8em;">(Auto-detected: ${itemName})</span>`;
+
+            // Show a success alert
+            showAlert(`✨ Auto-detected "${itemName}"! Form filled with: ${itemData.description}, ${itemData.defaultQuantity} ${itemData.unit}`, 'success');
+
+            // Reset label after 3 seconds
+            setTimeout(() => {
+                nameLabel.innerHTML = originalText;
+            }, 3000);
         }
 
         // Show category connection visual feedback

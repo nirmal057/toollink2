@@ -191,7 +191,6 @@ inventorySchema.pre('save', function (next) {
 // Static method to get inventory statistics
 inventorySchema.statics.getStatistics = async function () {
     const stats = await this.aggregate([
-        { $match: { deletedAt: null } },
         {
             $group: {
                 _id: null,
@@ -200,7 +199,7 @@ inventorySchema.statics.getStatistics = async function () {
                 inactiveItems: { $sum: { $cond: [{ $eq: ['$status', 'inactive'] }, 1, 0] } },
                 lowStockItems: { $sum: { $cond: [{ $lte: ['$current_stock', '$min_stock_level'] }, 1, 0] } },
                 outOfStockItems: { $sum: { $cond: [{ $eq: ['$current_stock', 0] }, 1, 0] } },
-                totalValue: { $sum: { $multiply: ['$current_stock', '$cost'] } },
+                totalValue: { $sum: { $multiply: ['$current_stock', { $ifNull: ['$unit_price', '$cost', 0] }] } },
                 totalQuantity: { $sum: '$current_stock' }
             }
         }
@@ -208,7 +207,7 @@ inventorySchema.statics.getStatistics = async function () {
 
     // Get category distribution
     const categoryStats = await this.aggregate([
-        { $match: { deletedAt: null, status: 'active' } },
+        { $match: { status: 'active' } },
         { $group: { _id: '$category', count: { $sum: 1 } } },
         { $sort: { count: -1 } }
     ]);
@@ -232,7 +231,6 @@ inventorySchema.statics.getStatistics = async function () {
 // Static method to get low stock items
 inventorySchema.statics.getLowStockItems = async function () {
     return await this.find({
-        deletedAt: null,
         status: 'active',
         $expr: { $lte: ['$current_stock', '$min_stock_level'] },
         low_stock_alert: true
@@ -255,7 +253,6 @@ inventorySchema.statics.searchInventory = async function (query, options = {}) {
     } = options;
 
     const filter = {
-        deletedAt: null,
         status
     };
 

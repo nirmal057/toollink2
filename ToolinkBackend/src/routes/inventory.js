@@ -307,7 +307,7 @@ router.patch('/:id/quantity', authorize('admin', 'warehouse'), async (req, res) 
     }
 });
 
-// Delete inventory item (soft delete)
+// Delete inventory item (permanent deletion)
 router.delete('/:id', authorize('admin', 'warehouse'), async (req, res) => {
     try {
         const item = await Inventory.findById(req.params.id);
@@ -320,23 +320,33 @@ router.delete('/:id', authorize('admin', 'warehouse'), async (req, res) => {
             });
         }
 
-        // Soft delete
-        item.deletedAt = new Date();
-        item.updated_by = req.user._id;
-        await item.save();
+        // Store item details before deletion
+        const deletedItem = {
+            id: item._id,
+            name: item.name,
+            sku: item.sku,
+            category: item.category,
+            deletedBy: req.user.fullName,
+            deletedAt: new Date()
+        };
 
-        logger.info(`Inventory item deleted: ${item.name} by ${req.user.fullName}`);
+        // Permanent delete from database
+        await Inventory.findByIdAndDelete(req.params.id);
+
+        logger.info(`Inventory item permanently deleted: ${item.name} (SKU: ${item.sku}) by ${req.user.fullName}`);
 
         res.json({
             success: true,
-            message: 'Inventory item deleted successfully'
+            message: 'Inventory item permanently deleted from database',
+            data: deletedItem
         });
     } catch (error) {
         logger.error('Delete inventory item error:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to delete inventory item',
-            errorType: 'DELETE_ITEM_ERROR'
+            errorType: 'DELETE_ITEM_ERROR',
+            details: error.message
         });
     }
 });
@@ -345,7 +355,6 @@ router.delete('/:id', authorize('admin', 'warehouse'), async (req, res) => {
 router.get('/categories', async (req, res) => {
     try {
         const categories = await Inventory.distinct('category', {
-            deletedAt: null,
             status: 'active'
         });
 
@@ -367,7 +376,6 @@ router.get('/categories', async (req, res) => {
 router.get('/locations', async (req, res) => {
     try {
         const locations = await Inventory.distinct('location', {
-            deletedAt: null,
             status: 'active'
         });
 

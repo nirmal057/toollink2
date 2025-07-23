@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Test Admin Activities</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #2563eb;
+        }
+
+        .success {
+            background-color: #10b981;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .result.success {
+            background-color: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+        }
+
+        .result.error {
+            background-color: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔧 Admin Activities Test</h1>
+        <p>Test the Recent Activity "View All Activities" functionality.</p>
+
+        <div>
+            <button onclick="loginAdmin()" class="success">1. Login as Admin</button>
+            <button onclick="testAdminDashboard()">2. Test Admin Dashboard</button>
+            <button onclick="testActivitiesPage()">3. Test Activities Page</button>
+            <button onclick="openActivitiesPage()">4. Open Activities Page</button>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3000/api';
+        const FRONTEND_URL = 'http://localhost:5173';
+
+        function showResult(message, type = 'success') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.textContent = message;
+        }
+
+        async function loginAdmin() {
+            showResult('🔄 Logging in as admin...', 'info');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@toollink.com',
+                        password: 'admin123'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Login failed: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                localStorage.setItem('accessToken', data.accessToken);
+                localStorage.setItem('refreshToken', data.refreshToken);
+                localStorage.setItem('user', JSON.stringify(data.user));
+
+                showResult(`✅ Admin login successful!
+User: ${data.user.username} (${data.user.role})
+Token stored for API calls.
+
+Next: Test Admin Dashboard`, 'success');
+
+            } catch (error) {
+                showResult(`❌ Login failed: ${error.message}`, 'error');
+            }
+        }
+
+        function testAdminDashboard() {
+            const token = localStorage.getItem('accessToken');
+            if (!token) {
+                showResult('❌ Please login first!', 'error');
+                return;
+            }
+
+            showResult('🔄 Opening Admin Dashboard...', 'info');
+            window.open(`${FRONTEND_URL}/admin`, '_blank');
+
+            setTimeout(() => {
+                showResult(`✅ Admin Dashboard opened!
+
+Check the "Recent Activity" section:
+1. Should show recent activities
+2. "View All Activity →" button should be visible
+3. Click it to navigate to Activities page
+
+If activities don't show, check browser console for errors.`, 'success');
+            }, 1000);
+        }
+
+        function testActivitiesPage() {
+            const token = localStorage.getItem('accessToken');
+            if (!token) {
+                showResult('❌ Please login first!', 'error');
+                return;
+            }
+
+            showResult(`🔄 Testing Activities Page route...
+
+Route: ${FRONTEND_URL}/admin/activities
+Authentication: ✅ Token present
+Expected: Full activities list with filters`, 'info');
+        }
+
+        function openActivitiesPage() {
+            const token = localStorage.getItem('accessToken');
+            if (!token) {
+                showResult('❌ Please login first!', 'error');
+                return;
+            }
+
+            showResult('🔄 Opening Activities Page directly...', 'info');
+            window.open(`${FRONTEND_URL}/admin/activities`, '_blank');
+
+            setTimeout(() => {
+                showResult(`✅ Activities Page opened!
+
+Expected features:
+✅ Full list of activities (up to 50)
+✅ Filter by activity type
+✅ Search functionality
+✅ Back to dashboard button
+✅ Detailed activity information
+
+If page shows "404" or doesn't load:
+- Route might not be properly configured
+- Check browser console for errors
+- Verify ActivitiesPage component is working`, 'success');
+            }, 1000);
+        }
+
+        // Auto-check on load
+        window.addEventListener('load', () => {
+            const token = localStorage.getItem('accessToken');
+            if (token) {
+                showResult(`🔍 Ready to test!
+✅ Admin token present
+✅ Can test admin dashboard and activities
+
+Click "Test Admin Dashboard" to check Recent Activity section.`, 'success');
+            } else {
+                showResult(`🔍 Not logged in
+❌ No admin token found
+
+Click "Login as Admin" first.`, 'error');
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,5 +1,5 @@
 import express from 'express';
-import { authorize } from '../middleware/auth.js';
+import { authenticateToken, authorize } from '../middleware/auth.js';
 import User from '../models/User.js';
 import Order from '../models/Order.js';
 import Inventory from '../models/Inventory.js';
@@ -8,16 +8,23 @@ import logger from '../utils/logger.js';
 const router = express.Router();
 
 // Get dashboard data
-router.get('/dashboard', authorize('admin'), async (req, res) => {
+router.get('/dashboard', authenticateToken, authorize('admin'), async (req, res) => {
     try {
-        const [userStats, orderStats, inventoryStats] = await Promise.all([
+        const [userStats, roleDistribution, orderStats, inventoryStats] = await Promise.all([
             User.getStatistics(),
+            User.getRoleDistribution(),
             Order.getStatistics(),
             Inventory.getStatistics()
         ]);
 
+        // Add role distribution to user stats
+        const enhancedUserStats = {
+            ...userStats,
+            roleDistribution
+        };
+
         const dashboardData = {
-            users: userStats,
+            users: enhancedUserStats,
             orders: orderStats,
             inventory: inventoryStats,
             systemInfo: {
@@ -44,7 +51,7 @@ router.get('/dashboard', authorize('admin'), async (req, res) => {
 });
 
 // Get system audit logs
-router.get('/audit-logs', authorize('admin'), async (req, res) => {
+router.get('/audit-logs', authenticateToken, authorize('admin'), async (req, res) => {
     try {
         const { page = 1, limit = 50, action, userId, startDate, endDate } = req.query;
 
@@ -115,7 +122,7 @@ router.get('/audit-logs', authorize('admin'), async (req, res) => {
 });
 
 // Get system reports
-router.get('/reports', authorize('admin'), async (req, res) => {
+router.get('/reports', authenticateToken, authorize('admin'), async (req, res) => {
     try {
         const { type = 'summary', startDate, endDate } = req.query;
 
@@ -171,7 +178,7 @@ router.get('/reports', authorize('admin'), async (req, res) => {
 });
 
 // Get system configuration
-router.get('/config', authorize('admin'), async (req, res) => {
+router.get('/config', authenticateToken, authorize('admin'), async (req, res) => {
     try {
         const config = {
             system: {
@@ -214,7 +221,7 @@ router.get('/config', authorize('admin'), async (req, res) => {
 });
 
 // Update system configuration
-router.put('/config', authorize('admin'), async (req, res) => {
+router.put('/config', authenticateToken, authorize('admin'), async (req, res) => {
     try {
         const { features, limits } = req.body;
 

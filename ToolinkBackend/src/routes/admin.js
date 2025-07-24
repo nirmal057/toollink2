@@ -3,6 +3,8 @@ import { authenticateToken, authorize } from '../middleware/auth.js';
 import User from '../models/User.js';
 import Order from '../models/Order.js';
 import Inventory from '../models/Inventory.js';
+// import AuditLog from '../models/AuditLog.js';
+// import { AuditLogger } from '../middleware/auditLogger.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();

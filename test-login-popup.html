@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToolLink Login Popup Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .test-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+
+        .test-button:hover {
+            background: #2980b9;
+        }
+
+        .error-button {
+            background: #e74c3c;
+        }
+
+        .error-button:hover {
+            background: #c0392b;
+        }
+
+        .warning-button {
+            background: #f39c12;
+        }
+
+        .warning-button:hover {
+            background: #e67e22;
+        }
+
+        .success-button {
+            background: #27ae60;
+        }
+
+        .success-button:hover {
+            background: #229954;
+        }
+
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .scenario {
+            background: #fff;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔐 ToolLink Login Popup Messages Test</h1>
+        <p>This page demonstrates the popup messages that users will see when trying to login with different account
+            states.</p>
+    </div>
+
+    <div class="container">
+        <h2>📋 Test Scenarios</h2>
+
+        <div class="scenario">
+            <h3>1. ⏳ Pending Approval Account</h3>
+            <p><strong>When:</strong> New customer tries to login before admin approval</p>
+            <p><strong>Message:</strong> "Your account registration (submitted on [date]) is pending approval. Please
+                wait for an administrator to approve your registration. You will receive an email notification once
+                approved."</p>
+            <button class="test-button warning-button" onclick="testPendingApproval()">Test Pending Approval</button>
+        </div>
+
+        <div class="scenario">
+            <h3>2. ❌ Wrong Email or Password</h3>
+            <p><strong>When:</strong> User enters incorrect email or password</p>
+            <p><strong>Message:</strong> "Invalid email or password. Please check your credentials and try again."</p>
+            <button class="test-button error-button" onclick="testInvalidCredentials()">Test Invalid
+                Credentials</button>
+        </div>
+
+        <div class="scenario">
+            <h3>3. 🔒 Account Locked</h3>
+            <p><strong>When:</strong> Too many failed login attempts</p>
+            <p><strong>Message:</strong> "Your account has been temporarily locked due to multiple failed login
+                attempts. Please reset your password or try again later."</p>
+            <button class="test-button error-button" onclick="testAccountLocked()">Test Account Locked</button>
+        </div>
+
+        <div class="scenario">
+            <h3>4. ✅ Successful Login</h3>
+            <p><strong>When:</strong> Valid credentials provided</p>
+            <p><strong>Message:</strong> "Welcome back! Redirecting to dashboard..."</p>
+            <button class="test-button success-button" onclick="testSuccessfulLogin()">Test Successful Login</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🧪 How to Test with Real Application</h2>
+        <ol>
+            <li><strong>Start the servers:</strong> Make sure both frontend (port 5173) and backend (port 5000) are
+                running</li>
+            <li><strong>Go to login page:</strong> Visit <a href="http://localhost:5173/auth/login"
+                    target="_blank">http://localhost:5173/auth/login</a></li>
+            <li><strong>Test scenarios:</strong>
+                <ul>
+                    <li><strong>Pending Approval:</strong> Create a new customer account and try to login immediately
+                    </li>
+                    <li><strong>Wrong Credentials:</strong> Use email: wrong@example.com, password: wrongpass</li>
+                    <li><strong>Valid Login:</strong> Use email: admin@toollink.com, password: admin123</li>
+                </ul>
+            </li>
+            <li><strong>Observe:</strong> Toast popup notifications will appear in the top-right corner</li>
+        </ol>
+    </div>
+
+    <div class="container">
+        <h2>📈 Enhanced Features</h2>
+        <ul>
+            <li>✅ Toast popup notifications for all login states</li>
+            <li>✅ Enhanced error messages with emojis for better UX</li>
+            <li>✅ Different colors for different message types (warning, error, success)</li>
+            <li>✅ Auto-dismiss after appropriate time intervals</li>
+            <li>✅ Submission date included in pending approval messages</li>
+            <li>✅ Clear guidance for next steps in each scenario</li>
+        </ul>
+    </div>
+
+    <div id="results" class="results" style="display:none;">
+        <h3>Test Results:</h3>
+        <div id="resultContent"></div>
+    </div>
+
+    <script>
+        function showResult(message, type) {
+            const results = document.getElementById('results');
+            const content = document.getElementById('resultContent');
+
+            const colors = {
+                success: '#27ae60',
+                error: '#e74c3c',
+                warning: '#f39c12',
+                info: '#3498db'
+            };
+
+            content.innerHTML = `
+                <div style="color: ${colors[type]}; font-weight: bold; margin-bottom: 10px;">
+                    ${type.toUpperCase()}: ${message}
+                </div>
+                <p><em>In the real application, this would appear as a toast notification in the top-right corner.</em></p>
+            `;
+            results.style.display = 'block';
+            results.style.borderLeftColor = colors[type];
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                results.style.display = 'none';
+            }, 5000);
+        }
+
+        function testPendingApproval() {
+            const today = new Date().toLocaleDateString();
+            showResult(`⏳ Account Pending Approval: Your account registration (submitted on ${today}) is pending approval. Please wait for an administrator to approve your registration. You will receive an email notification once approved.`, 'warning');
+        }
+
+        function testInvalidCredentials() {
+            showResult('❌ Login Failed: Invalid email or password. Please check your credentials and try again.', 'error');
+        }
+
+        function testAccountLocked() {
+            showResult('🔒 Account Locked: Your account has been temporarily locked due to multiple failed login attempts. Please reset your password or try again later.', 'error');
+        }
+
+        function testSuccessfulLogin() {
+            showResult('✅ Login Successful: Welcome back! Redirecting to dashboard...', 'success');
+        }
+    </script>
+</body>
+
+</html>

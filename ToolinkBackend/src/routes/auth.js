@@ -5,6 +5,7 @@ import { body, validationResult } from 'express-validator';
 import User from '../models/User.js';
 import PendingCustomer from '../models/PendingCustomer.js';
 import { generateTokens, verifyRefreshToken, authenticateToken, requireRole } from '../middleware/auth.js';
+// import { AuditLogger } from '../middleware/auditLogger.js';
 import logger from '../utils/logger.js';
 import { sendEmail } from '../utils/emailService.js';
 import crypto from 'crypto';
@@ -43,10 +44,12 @@ router.post('/login', loginValidation, async (req, res) => {
         // Check if this is a pending customer first
         const pendingCustomer = await PendingCustomer.findByEmailOrUsername(email);
         if (pendingCustomer) {
+            const submittedDate = new Date(pendingCustomer.submittedAt).toLocaleDateString();
             return res.status(401).json({
                 success: false,
-                error: 'Your account is pending approval. Please wait for a cashier or admin to approve your registration.',
-                errorType: 'ACCOUNT_PENDING_APPROVAL'
+                error: `Your account registration (submitted on ${submittedDate}) is pending approval. Please wait for an administrator to approve your registration. You will receive an email notification once approved.`,
+                errorType: 'ACCOUNT_PENDING_APPROVAL',
+                submittedAt: pendingCustomer.submittedAt
             });
         }
 

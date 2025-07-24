@@ -227,25 +227,41 @@ router.post('/register', registerValidation, async (req, res) => {
 
             logger.info(`New customer registration submitted for approval: ${email}`);
 
+            // Send welcome email to the new customer
+            try {
+                await sendEmail({
+                    to: email,
+                    template: 'customer-registration-pending',
+                    data: {
+                        fullName,
+                        email,
+                        submittedAt: pendingCustomer.submittedAt
+                    }
+                });
+                logger.info(`Welcome email sent to new customer: ${email}`);
+            } catch (emailError) {
+                logger.error('Failed to send welcome email to customer:', emailError);
+            }
+
             // Send notification to admins/cashiers about new pending customer
             try {
                 const adminUsers = await User.find({
                     role: { $in: ['admin', 'cashier'] },
                     isActive: true
-                }).select('email');
+                }).select('email fullName');
 
                 for (const admin of adminUsers) {
                     await sendEmail({
                         to: admin.email,
-                        subject: 'New Customer Registration Pending Approval',
                         template: 'admin-new-customer-pending',
                         data: {
                             customerName: fullName,
                             customerEmail: email,
-                            approvalUrl: `${process.env.FRONTEND_URL}/customer-approval`
+                            approvalUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/customer-approval`
                         }
                     });
                 }
+                logger.info(`Admin notification emails sent for new customer: ${email}`);
             } catch (emailError) {
                 logger.error('Failed to send admin notification emails:', emailError);
             }
@@ -720,14 +736,15 @@ router.post('/approve-user', [
         try {
             await sendEmail({
                 to: user.email,
-                subject: 'Account Approved - Welcome to ToolLink!',
-                template: 'account-approved',
+                template: 'customer-approved',
                 data: {
                     fullName: user.fullName,
-                    loginUrl: `${process.env.FRONTEND_URL}/auth/login`,
-                    verificationUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`
+                    email: user.email,
+                    loginUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/auth/login`,
+                    verificationUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`
                 }
             });
+            logger.info(`Approval email sent to customer: ${user.email}`);
         } catch (emailError) {
             logger.error('Failed to send approval email:', emailError);
         }

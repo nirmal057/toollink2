@@ -4,6 +4,7 @@ import User from '../models/User.js';
 import { authorize, adminOnly, authenticateToken, authOnly } from '../middleware/auth.js';
 import { getDashboardAccess, getRolePermissions } from '../middleware/roleAuth.js';
 import logger from '../utils/logger.js';
+import { AuditLogger } from '../middleware/auditLogger.js';
 
 const router = express.Router();
 
@@ -135,10 +136,27 @@ router.put('/profile', authenticateToken, [
 
         const allowedUpdates = ['fullName', 'phone', 'address', 'preferences'];
         const updates = {};
+        const changes = {}; // Track what actually changed
+
+        // Get original user data for comparison
+        const originalUser = await User.findById(req.user._id);
 
         allowedUpdates.forEach(field => {
             if (req.body[field] !== undefined) {
                 updates[field] = req.body[field];
+
+                // Track changes for audit log
+                const originalValue = originalUser[field];
+                const newValue = req.body[field];
+
+                // Compare values (handling objects and primitives)
+                const valuesAreDifferent = JSON.stringify(originalValue) !== JSON.stringify(newValue);
+                if (valuesAreDifferent) {
+                    changes[field] = {
+                        from: originalValue,
+                        to: newValue
+                    };
+                }
             }
         });
 
@@ -153,6 +171,23 @@ router.put('/profile', authenticateToken, [
         ).select('-password -refreshTokens');
 
         logger.info(`Profile updated for user: ${user.email}`);
+
+        // Create audit log entry for profile update
+        if (Object.keys(changes).length > 0) {
+            await AuditLogger.logUserAction(
+                'user_updated',
+                req.user._id,
+                req.user._id, // User updating their own profile
+                req,
+                {
+                    action: 'profile_update',
+                    changedFields: Object.keys(changes),
+                    changes: changes,
+                    userEmail: user.email
+                },
+                'success'
+            );
+        }
 
         res.json({
             success: true,

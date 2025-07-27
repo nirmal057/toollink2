@@ -3,8 +3,8 @@ import { authenticateToken, authorize } from '../middleware/auth.js';
 import User from '../models/User.js';
 import Order from '../models/Order.js';
 import Inventory from '../models/Inventory.js';
-// import AuditLog from '../models/AuditLog.js';
-// import { AuditLogger } from '../middleware/auditLogger.js';
+import AuditLog from '../models/AuditLog.js';
+import { AuditLogger } from '../middleware/auditLogger.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -57,60 +57,47 @@ router.get('/audit-logs', authenticateToken, authorize('admin'), async (req, res
     try {
         const { page = 1, limit = 50, action, userId, startDate, endDate } = req.query;
 
-        // Mock audit logs for now
-        const mockAuditLogs = [
-            {
-                id: '1',
-                action: 'user_created',
-                userId: req.user._id,
-                targetId: 'user123',
-                details: { email: 'newuser@example.com', role: 'customer' },
-                timestamp: new Date().toISOString(),
-                ip: '192.168.1.100'
-            },
-            {
-                id: '2',
-                action: 'inventory_updated',
-                userId: req.user._id,
-                targetId: 'inv456',
-                details: { name: 'Tool A', quantity: 50 },
-                timestamp: new Date().toISOString(),
-                ip: '192.168.1.100'
-            },
-            {
-                id: '3',
-                action: 'order_status_changed',
-                userId: req.user._id,
-                targetId: 'ord789',
-                details: { from: 'pending', to: 'confirmed' },
-                timestamp: new Date().toISOString(),
-                ip: '192.168.1.100'
-            }
-        ];
-
-        // Filter logs
-        let filteredLogs = mockAuditLogs;
+        // Build filter
+        const filter = {};
 
         if (action) {
-            filteredLogs = filteredLogs.filter(log => log.action === action);
+            filter.action = action;
         }
 
         if (userId) {
-            filteredLogs = filteredLogs.filter(log => log.userId === userId);
+            filter.userId = userId;
+        }
+
+        if (startDate || endDate) {
+            filter.timestamp = {};
+            if (startDate) {
+                filter.timestamp.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                filter.timestamp.$lte = new Date(endDate);
+            }
         }
 
         // Pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
-        const paginatedLogs = filteredLogs.slice(skip, skip + parseInt(limit));
+
+        const [auditLogs, total] = await Promise.all([
+            AuditLog.find(filter)
+                .populate('userId', 'fullName email username')
+                .sort({ timestamp: -1 })
+                .skip(skip)
+                .limit(parseInt(limit)),
+            AuditLog.countDocuments(filter)
+        ]);
 
         res.json({
             success: true,
-            data: paginatedLogs,
+            data: auditLogs,
             pagination: {
                 page: parseInt(page),
                 limit: parseInt(limit),
-                total: filteredLogs.length,
-                pages: Math.ceil(filteredLogs.length / parseInt(limit))
+                total,
+                pages: Math.ceil(total / parseInt(limit))
             }
         });
     } catch (error) {

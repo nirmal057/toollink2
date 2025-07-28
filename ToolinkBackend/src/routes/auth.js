@@ -5,7 +5,7 @@ import { body, validationResult } from 'express-validator';
 import User from '../models/User.js';
 import PendingCustomer from '../models/PendingCustomer.js';
 import { generateTokens, verifyRefreshToken, authenticateToken, requireRole } from '../middleware/auth.js';
-// import { AuditLogger } from '../middleware/auditLogger.js';
+import { AuditLogger } from '../middleware/auditLogger.js';
 import logger from '../utils/logger.js';
 import { sendEmail } from '../utils/emailService.js';
 import crypto from 'crypto';
@@ -56,6 +56,24 @@ router.post('/login', loginValidation, async (req, res) => {
         // Find user by email or username in main database
         const user = await User.findByEmailOrUsername(email);
         if (!user) {
+            // Log failed login attempt for non-existent user
+            try {
+                await AuditLogger.logUserAction(
+                    'user_login',
+                    null, // No user ID since user doesn't exist
+                    null,
+                    req,
+                    {
+                        action: 'login_failed',
+                        attemptedEmail: email,
+                        reason: 'user_not_found'
+                    },
+                    'failure'
+                );
+            } catch (auditError) {
+                logger.error('Failed to log login audit for non-existent user:', auditError);
+            }
+
             return res.status(401).json({
                 success: false,
                 error: 'Invalid credentials',
@@ -94,6 +112,26 @@ router.post('/login', loginValidation, async (req, res) => {
         const isMatch = await user.comparePassword(password);
         if (!isMatch) {
             await user.incLoginAttempts();
+
+            // Log failed login attempt to audit trail
+            try {
+                await AuditLogger.logUserAction(
+                    'user_login',
+                    user._id,
+                    user._id,
+                    req,
+                    {
+                        action: 'login_failed',
+                        userEmail: user.email,
+                        reason: 'invalid_password',
+                        attemptNumber: (user.loginAttempts || 0) + 1
+                    },
+                    'failure'
+                );
+            } catch (auditError) {
+                logger.error('Failed to log failed login audit:', auditError);
+            }
+
             return res.status(401).json({
                 success: false,
                 error: 'Invalid credentials',
@@ -125,6 +163,25 @@ router.post('/login', loginValidation, async (req, res) => {
         await user.save();
 
         logger.info(`User ${user.email} logged in successfully`);
+
+        // Log successful login to audit trail
+        try {
+            await AuditLogger.logUserAction(
+                'user_login',
+                user._id,
+                user._id,
+                req,
+                {
+                    action: 'login_success',
+                    userEmail: user.email,
+                    userRole: user.role,
+                    loginMethod: 'email_password'
+                },
+                'success'
+            );
+        } catch (auditError) {
+            logger.error('Failed to log login audit:', auditError);
+        }
 
         res.json({
             success: true,
@@ -400,15 +457,34 @@ router.post('/refresh-token', verifyRefreshToken, async (req, res) => {
 router.post('/logout', async (req, res) => {
     try {
         const { refreshToken } = req.body;
+        let user = null;
 
         if (refreshToken) {
             // Find user and remove refresh token
             const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-            const user = await User.findById(decoded.userId);
+            user = await User.findById(decoded.userId);
 
             if (user) {
                 user.refreshTokens = user.refreshTokens.filter(token => token.token !== refreshToken);
                 await user.save();
+
+                // Log successful logout to audit trail
+                try {
+                    await AuditLogger.logUserAction(
+                        'user_logout',
+                        user._id,
+                        user._id,
+                        req,
+                        {
+                            action: 'logout_success',
+                            userEmail: user.email,
+                            userRole: user.role
+                        },
+                        'success'
+                    );
+                } catch (auditError) {
+                    logger.error('Failed to log logout audit:', auditError);
+                }
             }
         }
 

@@ -8,10 +8,12 @@ export const corsOptions = {
             'http://localhost:3000',
             'http://localhost:5173',
             'http://localhost:5174',  // Added for when Vite uses alternate port
+            'http://localhost:5175',  // Added for when Vite uses alternate port
             'http://localhost:3001',
             'http://127.0.0.1:3000',
             'http://127.0.0.1:5173',
             'http://127.0.0.1:5174',  // Added for when Vite uses alternate port
+            'http://127.0.0.1:5175',  // Added for when Vite uses alternate port
             'http://127.0.0.1:3001',
             process.env.FRONTEND_URL,
             process.env.CORS_ORIGIN

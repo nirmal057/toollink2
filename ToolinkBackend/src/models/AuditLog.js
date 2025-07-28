@@ -16,7 +16,7 @@ const auditLogSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true
+        required: false // Allow null for anonymous actions like failed login attempts
     },
     targetId: {
         type: String, // Can be ObjectId or any identifier for the target resource

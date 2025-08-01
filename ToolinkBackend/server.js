@@ -21,6 +21,7 @@ import feedbackRoutes from './src/routes/feedback.js';
 import activityRoutes from './src/routes/activity.js';
 import adminRoutes from './src/routes/admin.js';
 import predictionRoutes from './src/routes/predictions.js';
+import messageRoutes from './src/routes/messages.js';
 
 // Import middleware
 import { authenticateToken } from './src/middleware/auth.js';
@@ -125,6 +126,7 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/predictions', predictionRoutes);
+app.use('/api/messages', messageRoutes);
 
 // Error handling middleware (must be last)
 app.use(notFoundHandler);

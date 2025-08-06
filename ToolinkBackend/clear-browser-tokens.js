@@ -1,0 +1,32 @@
+#!/usr/bin/env node
+
+console.log('🧹 Browser Token Cleanup Instructions');
+console.log('=====================================');
+console.log('');
+console.log('The "Please login to view customer messages" alert appears because');
+console.log('there are corrupted or expired authentication tokens in your browser.');
+console.log('');
+console.log('🔧 To fix this issue:');
+console.log('');
+console.log('1️⃣ Open your browser and go to: http://localhost:5173');
+console.log('');
+console.log('2️⃣ Open Developer Tools (F12)');
+console.log('');
+console.log('3️⃣ Go to the "Application" or "Storage" tab');
+console.log('');
+console.log('4️⃣ Find "Local Storage" → "http://localhost:5173"');
+console.log('');
+console.log('5️⃣ Delete the "token" entry (or clear all local storage)');
+console.log('');
+console.log('6️⃣ Refresh the page');
+console.log('');
+console.log('7️⃣ Login with admin credentials:');
+console.log('   📧 Email: admin@toollink.com');
+console.log('   🔐 Password: admin123');
+console.log('');
+console.log('8️⃣ Navigate to Customer Messages section');
+console.log('');
+console.log('✅ Alternative Quick Fix:');
+console.log('   Run this in the browser console: localStorage.clear()');
+console.log('');
+console.log('🎯 The system is working correctly - you just need fresh authentication!');

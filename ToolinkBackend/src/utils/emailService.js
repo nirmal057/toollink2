@@ -3,29 +3,29 @@ import logger from './logger.js';
 
 // Create email transporter
 const createTransporter = () => {
-    // Use Gmail SMTP for ToolLink admin email
-    return nodemailer.createTransport({
-        service: 'gmail',
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false, // true for 465, false for other ports
-        auth: {
-            user: process.env.TOOLLINK_EMAIL || 'toollink1234@gmail.com',
-            pass: process.env.TOOLLINK_EMAIL_PASSWORD || 'yyyr loge fmgf qyag'
-        },
-        tls: {
-            rejectUnauthorized: false
-        }
-    });
+  // Use Gmail SMTP for ToolLink admin email
+  return nodemailer.createTransport({
+    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // true for 465, false for other ports
+    auth: {
+      user: process.env.TOOLLINK_EMAIL || 'toollink1234@gmail.com',
+      pass: process.env.TOOLLINK_EMAIL_PASSWORD || 'yyyr loge fmgf qyag'
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
 };
 
 const transporter = createTransporter();
 
 // Email templates
 const emailTemplates = {
-    'email-verification': {
-        subject: 'Welcome to ToolLink - Please verify your email',
-        html: (data) => `
+  'email-verification': {
+    subject: 'Welcome to ToolLink - Please verify your email',
+    html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 28px;">Welcome to ToolLink!</h1>
@@ -71,10 +71,10 @@ const emailTemplates = {
         </div>
       </div>
     `
-    },
-    'customer-registration-pending': {
-        subject: 'Welcome to ToolLink - Registration Received',
-        html: (data) => `
+  },
+  'customer-registration-pending': {
+    subject: 'Welcome to ToolLink - Registration Received',
+    html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 28px;">Welcome to ToolLink!</h1>
@@ -128,10 +128,10 @@ const emailTemplates = {
         </div>
       </div>
     `
-    },
-    'customer-approved': {
-        subject: '🎉 Your ToolLink account has been approved!',
-        html: (data) => `
+  },
+  'customer-approved': {
+    subject: '🎉 Your ToolLink account has been approved!',
+    html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 28px;">🎉 Account Approved!</h1>
@@ -184,10 +184,10 @@ const emailTemplates = {
         </div>
       </div>
     `
-    },
-    'admin-new-customer-pending': {
-        subject: '🔔 New Customer Registration Pending Approval',
-        html: (data) => `
+  },
+  'admin-new-customer-pending': {
+    subject: '🔔 New Customer Registration Pending Approval',
+    html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #6c757d 0%, #495057 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 24px;">🔔 New Customer Registration</h1>
@@ -222,10 +222,10 @@ const emailTemplates = {
         </div>
       </div>
     `
-    },
-    'password-reset': {
-        subject: 'Reset your ToolLink password',
-        html: (data) => `
+  },
+  'password-reset': {
+    subject: 'Reset your ToolLink password',
+    html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 28px;">🔒 Password Reset</h1>
@@ -267,10 +267,10 @@ const emailTemplates = {
         </div>
       </div>
     `
-    },
-    'order-confirmation': {
-        subject: '✅ Order Confirmation - ToolLink',
-        html: (data) => `
+  },
+  'order-confirmation': {
+    subject: '✅ Order Confirmation - ToolLink',
+    html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 28px;">✅ Order Confirmed!</h1>
@@ -305,61 +305,166 @@ const emailTemplates = {
         </div>
       </div>
     `
-    }
+  },
+  'customer-contact-message': {
+    subject: '📩 New Customer Message Received - ToolLink',
+    html: (data) => `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
+        <div style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); padding: 30px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 28px;">📩 New Customer Message</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">A customer has sent a message via the contact form</p>
+        </div>
+
+        <div style="padding: 30px; background: white;">
+          <h2 style="color: #333; margin-bottom: 20px;">New Message Alert</h2>
+
+          <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+            A new customer message has been received through the ToolLink contact form and requires your attention.
+          </p>
+
+          <div style="margin: 25px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #17a2b8;">
+            <h3 style="color: #333; margin-top: 0;">📋 Message Details:</h3>
+            <ul style="margin: 10px 0; padding-left: 20px; line-height: 1.8;">
+              <li><strong>Customer Name:</strong> ${data.customerName}</li>
+              <li><strong>Email:</strong> ${data.customerEmail}</li>
+              <li><strong>Phone:</strong> ${data.customerPhone || 'Not provided'}</li>
+              <li><strong>Subject:</strong> ${data.subject}</li>
+              <li><strong>Received:</strong> ${new Date().toLocaleString()}</li>
+            </ul>
+          </div>
+
+          <div style="margin: 25px 0; padding: 20px; background: #fff; border: 1px solid #dee2e6; border-radius: 8px;">
+            <h4 style="color: #333; margin-top: 0; margin-bottom: 15px;">💬 Message Content:</h4>
+            <p style="font-size: 16px; line-height: 1.6; margin: 0; padding: 15px; background: #f8f9fa; border-radius: 6px; font-style: italic;">
+              "${data.message}"
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${data.adminUrl || process.env.ADMIN_DASHBOARD_URL || 'http://localhost:5173/admin/messages'}" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 16px; display: inline-block;">
+              📧 Reply to Customer
+            </a>
+          </div>
+
+          <div style="background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 8px; padding: 20px; margin: 25px 0;">
+            <p style="color: #0c5460; margin: 0;">
+              💡 <strong>Quick Tip:</strong> Reply to this customer promptly to maintain excellent customer service standards.
+            </p>
+          </div>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">ToolLink Customer Message Notification System</p>
+          <p style="margin: 5px 0 0 0;">© ${new Date().getFullYear()} ToolLink. All rights reserved.</p>
+        </div>
+      </div>
+    `
+  },
+  'customer-message-reply': {
+    subject: '✉️ Reply from ToolLink Support',
+    html: (data) => `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
+        <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 28px;">✉️ ToolLink Support</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">We have responded to your message</p>
+        </div>
+
+        <div style="padding: 30px; background: white;">
+          <h2 style="color: #333; margin-bottom: 20px;">Hello ${data.customerName}!</h2>
+
+          <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+            Thank you for contacting ToolLink support. We have reviewed your message and here is our response:
+          </p>
+
+          <div style="margin: 25px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #28a745;">
+            <h4 style="color: #333; margin-top: 0; margin-bottom: 15px;">📧 Your Original Message:</h4>
+            <p style="font-size: 14px; line-height: 1.5; margin: 0; color: #666; font-style: italic;">
+              "${data.originalMessage}"
+            </p>
+          </div>
+
+          <div style="margin: 25px 0; padding: 20px; background: #fff; border: 1px solid #28a745; border-radius: 8px;">
+            <h4 style="color: #28a745; margin-top: 0; margin-bottom: 15px;">💬 Our Response:</h4>
+            <p style="font-size: 16px; line-height: 1.6; margin: 0;">
+              ${data.replyMessage}
+            </p>
+            <p style="font-size: 14px; color: #666; margin: 15px 0 0 0;">
+              <strong>Replied by:</strong> ${data.supportAgent || 'ToolLink Support Team'}
+            </p>
+          </div>
+
+          <p style="font-size: 16px; line-height: 1.6; margin: 25px 0;">
+            If you have any additional questions or need further assistance, please don't hesitate to contact us again.
+          </p>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${data.contactUrl || process.env.FRONTEND_URL || 'http://localhost:5173/contact'}" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 16px; display: inline-block;">
+              📞 Contact Us Again
+            </a>
+          </div>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">Thank you for choosing ToolLink!</p>
+          <p style="margin: 5px 0 0 0;">© ${new Date().getFullYear()} ToolLink. All rights reserved.</p>
+        </div>
+      </div>
+    `
+  }
 };
 
 // Send email function
 export const sendEmail = async ({ to, subject, template, data, html, text }) => {
-    try {
-        let emailSubject = subject;
-        let emailHtml = html;
-        let emailText = text;
+  try {
+    let emailSubject = subject;
+    let emailHtml = html;
+    let emailText = text;
 
-        // Use template if provided
-        if (template && emailTemplates[template]) {
-            emailSubject = emailTemplates[template].subject;
-            emailHtml = emailTemplates[template].html(data);
-        }
-
-        const mailOptions = {
-            from: `${process.env.FROM_NAME || 'ToolLink Admin'} <${process.env.TOOLLINK_EMAIL || 'toollink1234@gmail.com'}>`,
-            to,
-            subject: emailSubject,
-            html: emailHtml,
-            text: emailText
-        };
-
-        const result = await transporter.sendMail(mailOptions);
-
-        logger.info('Email sent successfully', {
-            to,
-            subject: emailSubject,
-            messageId: result.messageId
-        });
-
-        return result;
-    } catch (error) {
-        logger.error('Email sending failed', {
-            error: error.message,
-            to,
-            subject
-        });
-        throw error;
+    // Use template if provided
+    if (template && emailTemplates[template]) {
+      emailSubject = emailTemplates[template].subject;
+      emailHtml = emailTemplates[template].html(data);
     }
+
+    const mailOptions = {
+      from: `${process.env.FROM_NAME || 'ToolLink Admin'} <${process.env.TOOLLINK_EMAIL || 'toollink1234@gmail.com'}>`,
+      to,
+      subject: emailSubject,
+      html: emailHtml,
+      text: emailText
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+
+    logger.info('Email sent successfully', {
+      to,
+      subject: emailSubject,
+      messageId: result.messageId
+    });
+
+    return result;
+  } catch (error) {
+    logger.error('Email sending failed', {
+      error: error.message,
+      to,
+      subject
+    });
+    throw error;
+  }
 };
 
 // Send bulk emails
 export const sendBulkEmails = async (emails) => {
-    const results = [];
+  const results = [];
 
-    for (const email of emails) {
-        try {
-            const result = await sendEmail(email);
-            results.push({ success: true, email: email.to, result });
-        } catch (error) {
-            results.push({ success: false, email: email.to, error: error.message });
-        }
+  for (const email of emails) {
+    try {
+      const result = await sendEmail(email);
+      results.push({ success: true, email: email.to, result });
+    } catch (error) {
+      results.push({ success: false, email: email.to, error: error.message });
     }
+  }
 
-    return results;
+  return results;
 };

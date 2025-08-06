@@ -4,13 +4,26 @@ import { authenticateToken } from '../middleware/auth.js';
 import { requireRole } from '../middleware/roleAuth.js';
 import auditLogger from '../middleware/auditLogger.js';
 import User from '../models/User.js';
+import { sendEmail } from '../utils/emailService.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
 // Public endpoint to create a contact message (no authentication required)
 router.post('/contact', async (req, res) => {
     try {
-        const { name, email, subject, message } = req.body;
+        console.log('📨 Contact form submission received');
+        console.log('📄 Request body:', JSON.stringify(req.body, null, 2));
+        console.log('📊 Content-Type:', req.headers['content-type']);
+
+        const { name, email, subject, message, phone } = req.body;
+
+        console.log('🔍 Extracted fields:');
+        console.log('  - name:', name);
+        console.log('  - email:', email);
+        console.log('  - subject:', subject);
+        console.log('  - message:', message);
+        console.log('  - phone:', phone);
 
         // Validate required fields
         if (!name || !email || !subject || !message) {
@@ -31,26 +44,62 @@ router.post('/contact', async (req, res) => {
 
         // Create message document
         const contactMessage = new Message({
-            type: 'contact',
-            sender: null, // No authenticated user for contact form
-            recipient: null, // Will be handled by admin/cashier
+            customerName: name,
+            customerEmail: email,
+            customerPhone: phone || null,
             subject,
-            content: message,
-            status: 'pending',
-            priority: 'normal',
-            metadata: {
-                contactForm: {
-                    name,
-                    email,
-                    submittedAt: new Date()
-                }
-            }
+            messages: [{
+                content: message,
+                sender: 'customer',
+                senderName: name,
+                timestamp: new Date(),
+                isRead: false
+            }],
+            status: 'open',
+            priority: 'normal'
         });
 
         await contactMessage.save();
 
         // Log the contact form submission
         console.log(`New contact message from ${name} (${email}): ${subject}`);
+
+        // Send email notification to admin about new contact message
+        try {
+            // Get admin users to notify
+            const adminUsers = await User.find({
+                role: { $in: ['admin', 'manager'] },
+                isActive: true,
+                emailNotifications: { $ne: false } // Only notify if email notifications are not disabled
+            }).select('email fullName');
+
+            if (adminUsers.length > 0) {
+                // Send notification to each admin
+                const emailPromises = adminUsers.map(admin =>
+                    sendEmail({
+                        to: admin.email,
+                        template: 'customer-contact-message',
+                        data: {
+                            customerName: name,
+                            customerEmail: email,
+                            customerPhone: phone,
+                            subject: subject,
+                            message: message,
+                            adminName: admin.fullName,
+                            adminUrl: process.env.ADMIN_DASHBOARD_URL || 'http://localhost:5173/admin/messages'
+                        }
+                    })
+                );
+
+                await Promise.allSettled(emailPromises);
+                logger.info(`Email notifications sent to ${adminUsers.length} admin(s) for new contact message from ${email}`);
+            } else {
+                logger.warn('No admin users found to notify about new contact message');
+            }
+        } catch (emailError) {
+            logger.error('Failed to send email notification for contact message:', emailError);
+            // Don't fail the request if email notification fails
+        }
 
         res.status(201).json({
             success: true,
@@ -66,6 +115,32 @@ router.post('/contact', async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to send message. Please try again later.'
+        });
+    }
+});
+
+// Test route to get messages without authentication (for debugging)
+router.get('/test', async (req, res) => {
+    try {
+        console.log('🧪 Test route: Getting all messages without auth...');
+
+        const messages = await Message.find({})
+            .sort({ createdAt: -1 })
+            .limit(10);
+
+        console.log(`📊 Found ${messages.length} messages in database`);
+
+        res.json({
+            success: true,
+            data: messages,
+            count: messages.length
+        });
+
+    } catch (error) {
+        console.error('Error fetching test messages:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch messages'
         });
     }
 });
@@ -101,8 +176,6 @@ router.get('/', authenticateToken, requireRole('admin', 'cashier'), async (req, 
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
         const messages = await Message.find(filter)
-            .populate('sender', 'firstName lastName email role')
-            .populate('recipient', 'firstName lastName email role')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit));
@@ -140,10 +213,7 @@ router.get('/', authenticateToken, requireRole('admin', 'cashier'), async (req, 
 // Get a specific message (admin/cashier only)
 router.get('/:id', authenticateToken, requireRole('admin', 'cashier'), async (req, res) => {
     try {
-        const message = await Message.findById(req.params.id)
-            .populate('sender', 'firstName lastName email role')
-            .populate('recipient', 'firstName lastName email role')
-            .populate('thread.author', 'firstName lastName email role');
+        const message = await Message.findById(req.params.id);
 
         if (!message) {
             return res.status(404).json({
@@ -180,64 +250,6 @@ router.get('/:id', authenticateToken, requireRole('admin', 'cashier'), async (re
     }
 });
 
-// Reply to a message (admin/cashier only)
-router.post('/:id/reply', authenticateToken, requireRole('admin', 'cashier'), async (req, res) => {
-    try {
-        const { content } = req.body;
-
-        if (!content || !content.trim()) {
-            return res.status(400).json({
-                success: false,
-                error: 'Reply content is required'
-            });
-        }
-
-        const message = await Message.findById(req.params.id);
-
-        if (!message) {
-            return res.status(404).json({
-                success: false,
-                error: 'Message not found'
-            });
-        }
-
-        // Add reply to thread
-        message.thread.push({
-            author: req.user.id,
-            content: content.trim(),
-            timestamp: new Date()
-        });
-
-        message.status = 'replied';
-        message.lastReplyAt = new Date();
-
-        await message.save();
-
-        // Populate the new reply
-        await message.populate('thread.author', 'firstName lastName email role');
-
-        // Log the reply
-        auditLogger.log('MESSAGE_REPLY', req.user.id, {
-            action: 'reply_to_message',
-            messageId: message._id,
-            messageType: message.type
-        });
-
-        res.json({
-            success: true,
-            message: 'Reply sent successfully',
-            data: message
-        });
-
-    } catch (error) {
-        console.error('Error replying to message:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to send reply'
-        });
-    }
-});
-
 // Update message status (admin/cashier only)
 router.patch('/:id/status', authenticateToken, requireRole('admin', 'cashier'), async (req, res) => {
     try {
@@ -259,8 +271,7 @@ router.patch('/:id/status', authenticateToken, requireRole('admin', 'cashier'), 
                 ...(status === 'archived' && { archivedAt: new Date() })
             },
             { new: true }
-        ).populate('sender', 'firstName lastName email role')
-            .populate('recipient', 'firstName lastName email role');
+        );
 
         if (!message) {
             return res.status(404).json({
@@ -365,6 +376,98 @@ router.get('/stats/overview', authenticateToken, requireRole('admin', 'cashier')
         res.status(500).json({
             success: false,
             error: 'Failed to fetch statistics'
+        });
+    }
+});
+
+// Reply to a customer message (admin/cashier only)
+router.post('/:messageId/reply', authenticateToken, requireRole('admin', 'cashier'), async (req, res) => {
+    try {
+        const { messageId } = req.params;
+        const { replyMessage, markAsResolved = false } = req.body;
+
+        if (!replyMessage || replyMessage.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                error: 'Reply message is required'
+            });
+        }
+
+        // Find the original message
+        const message = await Message.findById(messageId);
+        if (!message) {
+            return res.status(404).json({
+                success: false,
+                error: 'Message not found'
+            });
+        }
+
+        // Add the reply to the conversation
+        const replyData = {
+            content: replyMessage.trim(),
+            sender: 'admin',
+            senderName: req.user.fullName || req.user.username || 'Support Team',
+            timestamp: new Date(),
+            isRead: true
+        };
+
+        message.messages.push(replyData);
+
+        // Update message status
+        if (markAsResolved) {
+            message.status = 'resolved';
+        } else {
+            message.status = 'in-progress';
+        }
+
+        message.updatedAt = new Date();
+        await message.save();
+
+        // Send email reply to customer
+        try {
+            await sendEmail({
+                to: message.customerEmail,
+                template: 'customer-message-reply',
+                data: {
+                    customerName: message.customerName,
+                    originalMessage: message.messages[0]?.content || message.subject,
+                    replyMessage: replyMessage.trim(),
+                    supportAgent: req.user.fullName || req.user.username || 'ToolLink Support Team',
+                    contactUrl: process.env.FRONTEND_URL || 'http://localhost:5173/contact'
+                }
+            });
+
+            logger.info(`Reply email sent to customer: ${message.customerEmail}`);
+        } catch (emailError) {
+            logger.error('Failed to send reply email to customer:', emailError);
+            // Don't fail the request if email sending fails
+        }
+
+        // Log the reply action
+        auditLogger.log('MESSAGE_REPLY', req.user.id, {
+            action: 'reply_to_message',
+            messageId: messageId,
+            customerEmail: message.customerEmail,
+            replyLength: replyMessage.length,
+            markAsResolved
+        });
+
+        res.json({
+            success: true,
+            message: 'Reply sent successfully',
+            data: {
+                messageId: message._id,
+                status: message.status,
+                replyId: message.messages[message.messages.length - 1]._id,
+                emailSent: true
+            }
+        });
+
+    } catch (error) {
+        logger.error('Error sending reply to customer message:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to send reply'
         });
     }
 });

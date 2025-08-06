@@ -410,6 +410,71 @@ const emailTemplates = {
         </div>
       </div>
     `
+  },
+
+  'customer-thank-you': {
+    subject: 'Thank you for contacting ToolLink - We received your message!',
+    html: (data) => `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
+        <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 28px;">✅ Message Received!</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">Thank you for contacting ToolLink</p>
+        </div>
+
+        <div style="padding: 30px; background: white;">
+          <h2 style="color: #333; margin-bottom: 20px;">Hello ${data.customerName}!</h2>
+
+          <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+            Thank you for reaching out to us! We have successfully received your message and want to let you know that we take every inquiry seriously.
+          </p>
+
+          <div style="background: #f8f9fa; border-left: 4px solid #28a745; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0;">
+            <h3 style="color: #333; margin-top: 0; display: flex; align-items: center;">
+              📧 Your Message Details
+            </h3>
+            <p style="margin: 5px 0;"><strong>Subject:</strong> ${data.subject}</p>
+            <p style="margin: 5px 0;"><strong>Submission ID:</strong> #${data.submissionId.toString().slice(-8).toUpperCase()}</p>
+            <p style="margin: 5px 0;"><strong>Received:</strong> ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+          </div>
+
+          <div style="background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 8px; padding: 20px; margin: 25px 0;">
+            <h3 style="color: #0066cc; margin-top: 0;">⏰ What happens next?</h3>
+            <ul style="margin: 10px 0; padding-left: 20px; color: #0066cc;">
+              <li>Our team will review your message within 24 hours</li>
+              <li>You'll receive a personalized response from our experts</li>
+              <li>We'll address your specific questions and requirements</li>
+              <li>If needed, we may contact you for additional information</li>
+            </ul>
+          </div>
+
+          <p style="font-size: 16px; line-height: 1.6; margin: 25px 0;">
+            In the meantime, feel free to explore our website and learn more about our services. If you have any urgent questions, don't hesitate to contact us directly.
+          </p>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${data.websiteUrl}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 16px; display: inline-block; margin-right: 10px;">
+              🌐 Visit Our Website
+            </a>
+            <a href="mailto:${data.supportEmail}" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 16px; display: inline-block;">
+              📧 Contact Support
+            </a>
+          </div>
+
+          <div style="margin-top: 30px; padding: 20px; background: #fff3cd; border-radius: 8px; border: 1px solid #ffeaa7;">
+            <h4 style="color: #856404; margin-top: 0;">📱 Stay Connected</h4>
+            <p style="color: #856404; margin: 0;">
+              Follow us on social media for the latest updates, tips, and industry insights from the ToolLink team.
+            </p>
+          </div>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">This is an automated confirmation email. Please do not reply to this email.</p>
+          <p style="margin: 5px 0;">For questions, contact us at <a href="mailto:${data.supportEmail}" style="color: #667eea;">${data.supportEmail}</a></p>
+          <p style="margin: 5px 0 0 0;">© ${new Date().getFullYear()} ${data.companyName}. All rights reserved.</p>
+        </div>
+      </div>
+    `
   }
 };
 

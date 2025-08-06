@@ -66,6 +66,7 @@ router.post('/contact', async (req, res) => {
 
         // Send email notification to admin about new contact message
         try {
+            console.log('📧 Attempting to send admin notifications...');
             // Get admin users to notify
             const adminUsers = await User.find({
                 role: { $in: ['admin', 'manager'] },
@@ -74,6 +75,7 @@ router.post('/contact', async (req, res) => {
             }).select('email fullName');
 
             if (adminUsers.length > 0) {
+                console.log(`📤 Sending notifications to ${adminUsers.length} admin(s)`);
                 // Send notification to each admin
                 const emailPromises = adminUsers.map(admin =>
                     sendEmail({
@@ -93,12 +95,39 @@ router.post('/contact', async (req, res) => {
 
                 await Promise.allSettled(emailPromises);
                 logger.info(`Email notifications sent to ${adminUsers.length} admin(s) for new contact message from ${email}`);
+                console.log('✅ Admin notification emails sent successfully');
             } else {
                 logger.warn('No admin users found to notify about new contact message');
+                console.log('⚠️ No admin users found to notify');
             }
         } catch (emailError) {
             logger.error('Failed to send email notification for contact message:', emailError);
+            console.log('❌ Admin email notification failed:', emailError.message);
             // Don't fail the request if email notification fails
+        }
+
+        // Send thank you email to customer
+        try {
+            console.log('💌 Attempting to send thank you email to customer...');
+            await sendEmail({
+                to: email,
+                template: 'customer-thank-you',
+                data: {
+                    customerName: name,
+                    subject: subject,
+                    submissionId: contactMessage._id,
+                    supportEmail: process.env.SUPPORT_EMAIL || 'support@toollink.com',
+                    companyName: 'ToolLink',
+                    websiteUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+                }
+            });
+
+            logger.info(`Thank you email sent to customer: ${email}`);
+            console.log(`✅ Thank you email sent to customer: ${email}`);
+        } catch (thankYouEmailError) {
+            logger.error('Failed to send thank you email to customer:', thankYouEmailError);
+            console.log('❌ Thank you email failed:', thankYouEmailError.message);
+            // Don't fail the request if thank you email fails
         }
 
         res.status(201).json({
@@ -383,63 +412,96 @@ router.get('/stats/overview', authenticateToken, requireRole('admin', 'cashier')
 // Reply to a customer message (admin/cashier only)
 router.post('/:messageId/reply', authenticateToken, requireRole('admin', 'cashier'), async (req, res) => {
     try {
+        console.log('📧 Processing reply to customer message...');
         const { messageId } = req.params;
-        const { replyMessage, markAsResolved = false } = req.body;
+        const { replyMessage, content, markAsResolved = false, sender, senderName } = req.body;
 
-        if (!replyMessage || replyMessage.trim() === '') {
+        // Support both 'replyMessage' and 'content' field names for compatibility
+        const messageContent = replyMessage || content;
+
+        console.log('📋 Reply details:');
+        console.log('  - Message ID:', messageId);
+        console.log('  - Content:', messageContent);
+        console.log('  - Mark as resolved:', markAsResolved);
+        console.log('  - Sender:', sender);
+        console.log('  - Sender name:', senderName);
+
+        if (!messageContent || messageContent.trim() === '') {
             return res.status(400).json({
                 success: false,
-                error: 'Reply message is required'
+                error: 'Reply message content is required'
             });
         }
 
         // Find the original message
         const message = await Message.findById(messageId);
         if (!message) {
+            console.log('❌ Message not found:', messageId);
             return res.status(404).json({
                 success: false,
                 error: 'Message not found'
             });
         }
 
+        console.log('📨 Original message found:');
+        console.log('  - Customer:', message.customerName);
+        console.log('  - Email:', message.customerEmail);
+        console.log('  - Subject:', message.subject);
+
+        // Determine sender information
+        const replyingSender = sender || 'admin';
+        const replyingSenderName = senderName || req.user.fullName || req.user.username || 'ToolLink Support Team';
+
         // Add the reply to the conversation
         const replyData = {
-            content: replyMessage.trim(),
-            sender: 'admin',
-            senderName: req.user.fullName || req.user.username || 'Support Team',
+            content: messageContent.trim(),
+            sender: replyingSender,
+            senderName: replyingSenderName,
             timestamp: new Date(),
             isRead: true
         };
 
         message.messages.push(replyData);
 
-        // Update message status
+        // Update message status based on action
         if (markAsResolved) {
             message.status = 'resolved';
+            message.resolvedAt = new Date();
+            console.log('✅ Message marked as resolved');
         } else {
             message.status = 'in-progress';
+            console.log('🔄 Message status updated to in-progress');
         }
 
         message.updatedAt = new Date();
         await message.save();
 
+        console.log('💾 Message updated in database successfully');
+
         // Send email reply to customer
+        let emailSent = false;
         try {
+            console.log('📤 Attempting to send email to customer...');
             await sendEmail({
                 to: message.customerEmail,
                 template: 'customer-message-reply',
                 data: {
                     customerName: message.customerName,
                     originalMessage: message.messages[0]?.content || message.subject,
-                    replyMessage: replyMessage.trim(),
-                    supportAgent: req.user.fullName || req.user.username || 'ToolLink Support Team',
-                    contactUrl: process.env.FRONTEND_URL || 'http://localhost:5173/contact'
+                    replyMessage: messageContent.trim(),
+                    supportAgent: replyingSenderName,
+                    contactUrl: process.env.FRONTEND_URL || 'http://localhost:5173/contact',
+                    companyName: 'ToolLink',
+                    supportEmail: process.env.SUPPORT_EMAIL || 'support@toollink.com'
                 }
             });
 
+            emailSent = true;
             logger.info(`Reply email sent to customer: ${message.customerEmail}`);
+            console.log(`✅ Reply email sent successfully to: ${message.customerEmail}`);
         } catch (emailError) {
             logger.error('Failed to send reply email to customer:', emailError);
+            console.log('❌ Failed to send reply email:', emailError.message);
             // Don't fail the request if email sending fails
         }
 
@@ -448,9 +510,15 @@ router.post('/:messageId/reply', authenticateToken, requireRole('admin', 'cashie
             action: 'reply_to_message',
             messageId: messageId,
             customerEmail: message.customerEmail,
-            replyLength: replyMessage.length,
-            markAsResolved
+            customerName: message.customerName,
+            replyLength: messageContent.length,
+            markAsResolved,
+            emailSent,
+            senderName: replyingSenderName,
+            timestamp: new Date()
         });
+
+        console.log('📋 Audit log created for reply action');
 
         res.json({
             success: true,
@@ -459,15 +527,25 @@ router.post('/:messageId/reply', authenticateToken, requireRole('admin', 'cashie
                 messageId: message._id,
                 status: message.status,
                 replyId: message.messages[message.messages.length - 1]._id,
-                emailSent: true
+                emailSent,
+                conversationLength: message.messages.length,
+                updatedAt: message.updatedAt,
+                reply: {
+                    content: messageContent.trim(),
+                    sender: replyingSender,
+                    senderName: replyingSenderName,
+                    timestamp: replyData.timestamp
+                }
             }
         });
 
     } catch (error) {
         logger.error('Error sending reply to customer message:', error);
+        console.log('❌ Error processing reply:', error.message);
         res.status(500).json({
             success: false,
-            error: 'Failed to send reply'
+            error: 'Failed to send reply. Please try again.',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 });

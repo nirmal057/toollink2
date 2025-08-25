@@ -3,34 +3,34 @@ import logger from './logger.js';
 
 // Create email transporter
 const createTransporter = () => {
-  // Use Gmail SMTP for ToolLink admin email
-  return nodemailer.createTransport({
-    service: 'gmail',
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-      user: process.env.TOOLLINK_EMAIL || 'toollink1234@gmail.com',
-      pass: process.env.TOOLLINK_EMAIL_PASSWORD || 'yyyr loge fmgf qyag'
-    },
-    tls: {
-      rejectUnauthorized: false
-    },
-    // Add additional configuration for Gmail
-    pool: true,
-    maxConnections: 5,
-    maxMessages: 100,
-    rateLimit: 10 // 10 emails per second max
-  });
+    // Use Gmail SMTP for ToolLink admin email
+    return nodemailer.createTransporter({
+        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false, // true for 465, false for other ports
+        auth: {
+            user: process.env.TOOLLINK_EMAIL || 'toollink1234@gmail.com',
+            pass: process.env.TOOLLINK_EMAIL_PASSWORD || 'yyyr loge fmgf qyag'
+        },
+        tls: {
+            rejectUnauthorized: false
+        },
+        // Add additional configuration for Gmail
+        pool: true,
+        maxConnections: 5,
+        maxMessages: 100,
+        rateLimit: 10 // 10 emails per second max
+    });
 };
 
 const transporter = createTransporter();
 
 // Email templates
 const emailTemplates = {
-  'email-verification': {
-    subject: 'Welcome to ToolLink - Please verify your email',
-    html: (data) => `
+    'email-verification': {
+        subject: 'Welcome to ToolLink - Please verify your email',
+        html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 28px;">Welcome to ToolLink!</h1>
@@ -76,10 +76,10 @@ const emailTemplates = {
         </div>
       </div>
     `
-  },
-  'customer-registration-pending': {
-    subject: 'Welcome to ToolLink - Registration Received',
-    html: (data) => `
+    },
+    'customer-registration-pending': {
+        subject: 'Welcome to ToolLink - Registration Received',
+        html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 28px;">Welcome to ToolLink!</h1>
@@ -133,10 +133,10 @@ const emailTemplates = {
         </div>
       </div>
     `
-  },
-  'customer-approved': {
-    subject: '🎉 Your ToolLink account has been approved!',
-    html: (data) => `
+    },
+    'customer-approved': {
+        subject: '🎉 Your ToolLink account has been approved!',
+        html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 28px;">🎉 Account Approved!</h1>
@@ -189,10 +189,10 @@ const emailTemplates = {
         </div>
       </div>
     `
-  },
-  'admin-new-customer-pending': {
-    subject: '🔔 New Customer Registration Pending Approval',
-    html: (data) => `
+    },
+    'admin-new-customer-pending': {
+        subject: '🔔 New Customer Registration Pending Approval',
+        html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #6c757d 0%, #495057 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 24px;">🔔 New Customer Registration</h1>
@@ -239,10 +239,10 @@ const emailTemplates = {
         </div>
       </div>
     `
-  },
-  'customer-rejected': {
-    subject: 'ToolLink Registration Update',
-    html: (data) => `
+    },
+    'customer-rejected': {
+        subject: 'ToolLink Registration Update',
+        html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 28px;">Registration Update</h1>
@@ -280,10 +280,10 @@ const emailTemplates = {
         </div>
       </div>
     `
-  },
-  'customer-contact-message': {
-    subject: '📩 New Customer Message Received - ToolLink',
-    html: (data) => `
+    },
+    'customer-contact-message': {
+        subject: '📩 New Customer Message Received - ToolLink',
+        html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 28px;">📩 New Customer Message</h1>
@@ -334,10 +334,10 @@ const emailTemplates = {
         </div>
       </div>
     `
-  },
-  'customer-message-reply': {
-    subject: '✉️ Reply from ToolLink Support',
-    html: (data) => `
+    },
+    'customer-message-reply': {
+        subject: '✉️ Reply from ToolLink Support',
+        html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 28px;">✉️ ToolLink Support</h1>
@@ -385,11 +385,11 @@ const emailTemplates = {
         </div>
       </div>
     `
-  },
+    },
 
-  'customer-thank-you': {
-    subject: 'Thank you for contacting ToolLink - We received your message!',
-    html: (data) => `
+    'customer-thank-you': {
+        subject: 'Thank you for contacting ToolLink - We received your message!',
+        html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px; text-align: center; color: white;">
           <h1 style="margin: 0; font-size: 28px;">✅ Message Received!</h1>
@@ -450,77 +450,77 @@ const emailTemplates = {
         </div>
       </div>
     `
-  }
+    }
 };
 
 // Send email function with improved error handling
 export const sendEmail = async ({ to, subject, template, data, html, text }) => {
-  try {
-    let emailSubject = subject;
-    let emailHtml = html;
-    let emailText = text;
+    try {
+        let emailSubject = subject;
+        let emailHtml = html;
+        let emailText = text;
 
-    // Use template if provided
-    if (template && emailTemplates[template]) {
-      emailSubject = emailTemplates[template].subject;
-      emailHtml = emailTemplates[template].html(data);
+        // Use template if provided
+        if (template && emailTemplates[template]) {
+            emailSubject = emailTemplates[template].subject;
+            emailHtml = emailTemplates[template].html(data);
+        }
+
+        const mailOptions = {
+            from: `${process.env.FROM_NAME || 'ToolLink Admin'} <${process.env.TOOLLINK_EMAIL || 'toollink1234@gmail.com'}>`,
+            to,
+            subject: emailSubject,
+            html: emailHtml,
+            text: emailText
+        };
+
+        // Verify transporter configuration before sending
+        await transporter.verify();
+
+        const result = await transporter.sendMail(mailOptions);
+
+        logger.info('Email sent successfully', {
+            to,
+            subject: emailSubject,
+            messageId: result.messageId
+        });
+
+        return result;
+    } catch (error) {
+        logger.error('Email sending failed', {
+            error: error.message,
+            to,
+            subject,
+            stack: error.stack
+        });
+        throw error;
     }
-
-    const mailOptions = {
-      from: `${process.env.FROM_NAME || 'ToolLink Admin'} <${process.env.TOOLLINK_EMAIL || 'toollink1234@gmail.com'}>`,
-      to,
-      subject: emailSubject,
-      html: emailHtml,
-      text: emailText
-    };
-
-    // Verify transporter configuration before sending
-    await transporter.verify();
-
-    const result = await transporter.sendMail(mailOptions);
-
-    logger.info('Email sent successfully', {
-      to,
-      subject: emailSubject,
-      messageId: result.messageId
-    });
-
-    return result;
-  } catch (error) {
-    logger.error('Email sending failed', {
-      error: error.message,
-      to,
-      subject,
-      stack: error.stack
-    });
-    throw error;
-  }
 };
 
 // Send bulk emails
 export const sendBulkEmails = async (emails) => {
-  const results = [];
+    const results = [];
 
-  for (const email of emails) {
-    try {
-      const result = await sendEmail(email);
-      results.push({ success: true, email: email.to, result });
-    } catch (error) {
-      results.push({ success: false, email: email.to, error: error.message });
+    for (const email of emails) {
+        try {
+            const result = await sendEmail(email);
+            results.push({ success: true, email: email.to, result });
+        } catch (error) {
+            results.push({ success: false, email: email.to, error: error.message });
+        }
     }
-  }
 
-  return results;
+    return results;
 };
 
 // Test email connectivity
 export const testEmailConnection = async () => {
-  try {
-    await transporter.verify();
-    logger.info('Email service connection verified successfully');
-    return { success: true, message: 'Email service is working correctly' };
-  } catch (error) {
-    logger.error('Email service connection failed', { error: error.message });
-    return { success: false, message: error.message };
-  }
+    try {
+        await transporter.verify();
+        logger.info('Email service connection verified successfully');
+        return { success: true, message: 'Email service is working correctly' };
+    } catch (error) {
+        logger.error('Email service connection failed', { error: error.message });
+        return { success: false, message: error.message };
+    }
 };

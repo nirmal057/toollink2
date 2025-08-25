@@ -32,6 +32,7 @@ import { corsOptions } from './src/config/cors.js';
 
 // Import utilities
 import { createDefaultAdmin } from './src/utils/createDefaultAdmin.js';
+import { testEmailConnection } from './src/utils/emailService.js';
 import logger from './src/utils/logger.js';
 
 // Get directory path
@@ -112,6 +113,32 @@ app.get('/health', (req, res) => {
         timestamp: new Date().toISOString(),
         uptime: process.uptime()
     });
+});
+
+// Email test endpoint
+app.get('/test-email', async (req, res) => {
+    try {
+        const result = await testEmailConnection();
+        if (result.success) {
+            res.status(200).json({
+                success: true,
+                message: 'Email service is working correctly',
+                details: result.message
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'Email service is not working',
+                error: result.message
+            });
+        }
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to test email service',
+            error: error.message
+        });
+    }
 });
 
 // Routes

@@ -1,4 +1,20 @@
-import nodemailer from 'nodemailer';
+imp// Create email transporter
+const createTransporter = () => {
+  // Use Gmail SMTP for ToolLink admin email
+  return nodemailer.createTransporter({
+    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // true for 465, false for other ports
+    auth: {
+      user: process.env.TOOLLINK_EMAIL || 'toollink1234@gmail.com',
+      pass: process.env.TOOLLINK_EMAIL_PASSWORD || 'yyyr loge fmgf qyag'
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+};om 'nodemailer';
 import logger from './logger.js';
 
 // Create email transporter
@@ -15,12 +31,7 @@ const createTransporter = () => {
     },
     tls: {
       rejectUnauthorized: false
-    },
-    // Add additional configuration for Gmail
-    pool: true,
-    maxConnections: 5,
-    maxMessages: 100,
-    rateLimit: 10 // 10 emails per second max
+    }
   });
 };
 
@@ -203,79 +214,109 @@ const emailTemplates = {
           <h2 style="color: #333; margin-bottom: 20px;">New Customer Awaiting Approval</h2>
 
           <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
-            A new customer has registered for a ToolLink account and requires administrator approval before they can access the system.
+            A new customer has registered and is waiting for approval to access ToolLink.
           </p>
 
-          <div style="margin: 25px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #6c757d;">
-            <h3 style="color: #333; margin-top: 0;">👤 Customer Details:</h3>
+          <div style="margin: 25px 0; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+            <h3 style="color: #333; margin-top: 0;">Customer Details:</h3>
             <ul style="margin: 10px 0; padding-left: 20px; line-height: 1.8;">
-              <li><strong>Full Name:</strong> ${data.fullName}</li>
-              <li><strong>Email:</strong> ${data.email}</li>
-              <li><strong>Phone:</strong> ${data.phone || 'Not provided'}</li>
-              <li><strong>Registration Date:</strong> ${new Date(data.submittedAt).toLocaleString()}</li>
-              <li><strong>Status:</strong> Pending Approval</li>
+              <li><strong>Name:</strong> ${data.customerName}</li>
+              <li><strong>Email:</strong> ${data.customerEmail}</li>
+              <li><strong>Registration Date:</strong> ${new Date().toLocaleDateString()}</li>
             </ul>
           </div>
 
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${data.adminUrl || process.env.ADMIN_DASHBOARD_URL + '/customers/pending'}" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 16px; display: inline-block; margin-right: 10px;">
-              ✅ Approve Customer
+            <a href="${data.approvalUrl}" style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 16px; display: inline-block;">
+              👤 Review & Approve
             </a>
-            <a href="${data.adminUrl || process.env.ADMIN_DASHBOARD_URL + '/customers/pending'}" style="background: linear-gradient(135deg, #6c757d 0%, #495057 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 16px; display: inline-block;">
-              📋 Review Details
-            </a>
-          </div>
-
-          <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 25px 0;">
-            <p style="color: #856404; margin: 0;">
-              💡 <strong>Quick Reminder:</strong> Please review and approve customer registrations promptly to maintain excellent customer service standards.
-            </p>
           </div>
         </div>
 
         <div style="background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
-          <p style="margin: 0;">ToolLink Customer Registration System</p>
-          <p style="margin: 5px 0 0 0;">© ${new Date().getFullYear()} ToolLink. All rights reserved.</p>
+          <p style="margin: 0;">ToolLink Admin Notification System</p>
         </div>
       </div>
     `
   },
-  'customer-rejected': {
-    subject: 'ToolLink Registration Update',
+  'password-reset': {
+    subject: 'Reset your ToolLink password',
     html: (data) => `
       <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
         <div style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); padding: 30px; text-align: center; color: white;">
-          <h1 style="margin: 0; font-size: 28px;">Registration Update</h1>
-          <p style="margin: 10px 0 0 0; font-size: 16px;">Regarding your ToolLink application</p>
+          <h1 style="margin: 0; font-size: 28px;">🔒 Password Reset</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">Reset your ToolLink password</p>
         </div>
 
         <div style="padding: 30px; background: white;">
           <h2 style="color: #333; margin-bottom: 20px;">Hello ${data.fullName},</h2>
 
           <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
-            Thank you for your interest in ToolLink. After careful review of your registration, we are unable to approve your account at this time.
+            You requested to reset your password for your ToolLink account. Click the button below to create a new password:
           </p>
 
-          <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 20px; margin: 25px 0;">
-            <h3 style="color: #721c24; margin-top: 0;">Reason for Decision:</h3>
-            <p style="color: #721c24; margin: 10px 0;">
-              ${data.reason || 'Your application did not meet our current approval criteria.'}
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${data.resetUrl}" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 16px; display: inline-block;">
+              🔑 Reset Password
+            </a>
+          </div>
+
+          <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 25px 0;">
+            <p style="color: #856404; margin: 0;">
+              ⏰ <strong>Important:</strong> This link will expire in 10 minutes for security reasons.
+            </p>
+          </div>
+
+          <p style="font-size: 14px; color: #666; margin-top: 25px;">
+            If the button above doesn't work, copy and paste this link into your browser:<br>
+            <a href="${data.resetUrl}" style="color: #dc3545; word-break: break-all;">${data.resetUrl}</a>
+          </p>
+
+          <p style="font-size: 16px; line-height: 1.6; margin: 25px 0;">
+            If you didn't request this password reset, please ignore this email. Your password will remain unchanged.
+          </p>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">For security reasons, never share this email with others.</p>
+          <p style="margin: 5px 0 0 0;">© ${new Date().getFullYear()} ToolLink. All rights reserved.</p>
+        </div>
+      </div>
+    `
+  },
+  'order-confirmation': {
+    subject: '✅ Order Confirmation - ToolLink',
+    html: (data) => `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
+        <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 28px;">✅ Order Confirmed!</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">Your order has been received</p>
+        </div>
+
+        <div style="padding: 30px; background: white;">
+          <h2 style="color: #333; margin-bottom: 20px;">Hello ${data.customerName}!</h2>
+
+          <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+            Thank you for your order! Your order <strong>#${data.orderNumber}</strong> has been confirmed and is being processed.
+          </p>
+
+          <div style="margin: 25px 0; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+            <h3 style="color: #333; margin-top: 0;">📦 Order Details:</h3>
+            <ul style="margin: 10px 0; padding-left: 20px; line-height: 1.8;">
+              ${data.items.map(item => `<li><strong>${item.name}</strong> - Quantity: ${item.quantity}</li>`).join('')}
+            </ul>
+            <p style="margin: 15px 0 0 0; font-size: 18px; font-weight: bold; color: #28a745;">
+              💰 Total: $${data.total}
             </p>
           </div>
 
           <p style="font-size: 16px; line-height: 1.6; margin: 25px 0;">
-            If you believe this decision was made in error or if you would like to discuss your application further, please don't hesitate to contact our support team.
+            We'll notify you when your order is ready for delivery. You can track your order status in your account dashboard.
           </p>
-
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="mailto:${process.env.SUPPORT_EMAIL || 'support@toollink.com'}" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 16px; display: inline-block;">
-              📧 Contact Support
-            </a>
-          </div>
         </div>
 
         <div style="background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
-          <p style="margin: 0;">Thank you for your understanding.</p>
+          <p style="margin: 0;">Thank you for choosing ToolLink!</p>
           <p style="margin: 5px 0 0 0;">© ${new Date().getFullYear()} ToolLink. All rights reserved.</p>
         </div>
       </div>
@@ -453,7 +494,7 @@ const emailTemplates = {
   }
 };
 
-// Send email function with improved error handling
+// Send email function
 export const sendEmail = async ({ to, subject, template, data, html, text }) => {
   try {
     let emailSubject = subject;
@@ -474,9 +515,6 @@ export const sendEmail = async ({ to, subject, template, data, html, text }) => 
       text: emailText
     };
 
-    // Verify transporter configuration before sending
-    await transporter.verify();
-
     const result = await transporter.sendMail(mailOptions);
 
     logger.info('Email sent successfully', {
@@ -490,8 +528,7 @@ export const sendEmail = async ({ to, subject, template, data, html, text }) => 
     logger.error('Email sending failed', {
       error: error.message,
       to,
-      subject,
-      stack: error.stack
+      subject
     });
     throw error;
   }
@@ -511,16 +548,4 @@ export const sendBulkEmails = async (emails) => {
   }
 
   return results;
-};
-
-// Test email connectivity
-export const testEmailConnection = async () => {
-  try {
-    await transporter.verify();
-    logger.info('Email service connection verified successfully');
-    return { success: true, message: 'Email service is working correctly' };
-  } catch (error) {
-    logger.error('Email service connection failed', { error: error.message });
-    return { success: false, message: error.message };
-  }
 };

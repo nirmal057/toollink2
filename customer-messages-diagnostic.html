@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Messages Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+
+        .info {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+
+        .status-indicator {
+            padding: 5px 10px;
+            border-radius: 3px;
+            color: white;
+            font-weight: bold;
+        }
+
+        .status-running {
+            background-color: #28a745;
+        }
+
+        .status-stopped {
+            background-color: #dc3545;
+        }
+
+        .status-unknown {
+            background-color: #6c757d;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔍 Customer Messages Debug Test</h1>
+        <p><strong>Purpose:</strong> Diagnose and fix customer messages page issues</p>
+
+        <div class="section info">
+            <h3>📊 System Status</h3>
+            <div id="systemStatus">Checking system status...</div>
+        </div>
+
+        <div class="section">
+            <h3>🔑 Step 1: Test Authentication</h3>
+            <div>
+                <input type="email" id="email" placeholder="Admin Email" value="admin@toollink.com">
+                <input type="password" id="password" placeholder="Password" value="admin123">
+                <button onclick="testAuth()">Test Admin Login</button>
+            </div>
+            <div id="authResult"></div>
+        </div>
+
+        <div class="section">
+            <h3>📬 Step 2: Test Messages API</h3>
+            <button onclick="testMessagesAPI()">Test Messages API Direct</button>
+            <button onclick="testMessagesWithAuth()">Test Messages API with Auth</button>
+            <div id="apiResult"></div>
+        </div>
+
+        <div class="section">
+            <h3>🌐 Step 3: Test Frontend Page</h3>
+            <button onclick="testFrontendPage()">Open Customer Messages Page</button>
+            <button onclick="checkConsoleErrors()">Check Console Errors</button>
+            <div id="frontendResult"></div>
+        </div>
+
+        <div class="section">
+            <h3>🔧 Step 4: Diagnostic Results</h3>
+            <div id="diagnosticResults"></div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+        const API_BASE = 'http://localhost:5000';
+        const FRONTEND_BASE = 'http://localhost:5173';
+
+        function updateResult(elementId, content, className = '') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = content;
+            if (className) element.className = className;
+        }
+
+        async function checkSystemStatus() {
+            let frontendStatus = 'unknown';
+            let backendStatus = 'unknown';
+
+            // Check frontend
+            try {
+                const frontendResponse = await fetch(FRONTEND_BASE, { method: 'HEAD' });
+                frontendStatus = frontendResponse.ok ? 'running' : 'error';
+            } catch (e) {
+                frontendStatus = 'stopped';
+            }
+
+            // Check backend
+            try {
+                const backendResponse = await fetch(`${API_BASE}/api/messages/test`);
+                backendStatus = backendResponse.ok ? 'running' : 'error';
+            } catch (e) {
+                backendStatus = 'stopped';
+            }
+
+            updateResult('systemStatus', `
+                <div>
+                    Frontend (5173): <span class="status-indicator status-${frontendStatus}">${frontendStatus.toUpperCase()}</span><br>
+                    Backend (5000): <span class="status-indicator status-${backendStatus}">${backendStatus.toUpperCase()}</span>
+                </div>
+            `);
+
+            return { frontend: frontendStatus, backend: backendStatus };
+        }
+
+        async function testAuth() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    authToken = data.data.accessToken;
+                    updateResult('authResult', `
+                        <div class="success">
+                            ✅ <strong>Authentication Successful</strong><br>
+                            Token: ${authToken ? authToken.substring(0, 30) + '...' : 'None'}<br>
+                            User: ${data.data.user?.fullName || data.data.user?.username}<br>
+                            Role: ${data.data.user?.role}<br>
+                            User ID: ${data.data.user?._id}
+                        </div>
+                    `);
+                } else {
+                    updateResult('authResult', `
+                        <div class="error">
+                            ❌ <strong>Authentication Failed</strong><br>
+                            Error: ${data.error || 'Unknown error'}<br>
+                            Status: ${response.status}<br>
+                            Response: <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `);
+                }
+            } catch (error) {
+                updateResult('authResult', `
+                    <div class="error">
+                        ❌ <strong>Authentication Error</strong><br>
+                        Error: ${error.message}<br>
+                        Is backend running on port 5000?
+                    </div>
+                `);
+            }
+        }
+
+        async function testMessagesAPI() {
+            try {
+                const response = await fetch(`${API_BASE}/api/messages/test`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                updateResult('apiResult', `
+                    <div class="success">
+                        ✅ <strong>Messages API Test Endpoint Works</strong><br>
+                        Status: ${response.status}<br>
+                        Response: <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `);
+            } catch (error) {
+                updateResult('apiResult', `
+                    <div class="error">
+                        ❌ <strong>Messages API Test Failed</strong><br>
+                        Error: ${error.message}
+                    </div>
+                `);
+            }
+        }
+
+        async function testMessagesWithAuth() {
+            if (!authToken) {
+                updateResult('apiResult', '<div class="error">❌ Please authenticate first</div>');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/messages`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const messages = data.data?.messages || data.data || [];
+                    updateResult('apiResult', `
+                        <div class="success">
+                            ✅ <strong>Messages API Works with Authentication</strong><br>
+                            Status: ${response.status}<br>
+                            Messages Count: ${Array.isArray(messages) ? messages.length : 'N/A'}<br>
+                            Success: ${data.success ? 'Yes' : 'No'}<br>
+                            Response Structure: <pre>${JSON.stringify(data, null, 2).substring(0, 500)}...</pre>
+                        </div>
+                    `);
+                } else {
+                    updateResult('apiResult', `
+                        <div class="error">
+                            ❌ <strong>Messages API Failed</strong><br>
+                            Status: ${response.status}<br>
+                            Error: ${data.error || 'Unknown error'}<br>
+                            Response: <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `);
+                }
+            } catch (error) {
+                updateResult('apiResult', `
+                    <div class="error">
+                        ❌ <strong>Messages API Error</strong><br>
+                        Error: ${error.message}
+                    </div>
+                `);
+            }
+        }
+
+        async function testFrontendPage() {
+            if (!authToken) {
+                updateResult('frontendResult', '<div class="error">❌ Please authenticate first to test the frontend</div>');
+                return;
+            }
+
+            // Store token in localStorage for the frontend
+            localStorage.setItem('accessToken', authToken);
+
+            // Open the customer messages page
+            const messagesUrl = `${FRONTEND_BASE}/admin/messages`;
+            window.open(messagesUrl, '_blank');
+
+            updateResult('frontendResult', `
+                <div class="info">
+                    ℹ️ <strong>Opening Customer Messages Page</strong><br>
+                    URL: <a href="${messagesUrl}" target="_blank">${messagesUrl}</a><br>
+                    Token stored in localStorage for authentication<br>
+                    Check the opened page for any errors
+                </div>
+            `);
+        }
+
+        async function checkConsoleErrors() {
+            updateResult('frontendResult', `
+                <div class="info">
+                    ℹ️ <strong>Console Error Check</strong><br>
+                    Open browser DevTools (F12) and check the Console tab for any JavaScript errors.<br>
+                    Common issues to look for:<br>
+                    • Network errors (failed API calls)<br>
+                    • Authentication errors (401 Unauthorized)<br>
+                    • Component rendering errors<br>
+                    • CORS errors<br>
+                    • Missing dependencies
+                </div>
+            `);
+        }
+
+        async function runFullDiagnostic() {
+            updateResult('diagnosticResults', '<div class="info">🔄 Running full diagnostic...</div>');
+
+            const systemStatus = await checkSystemStatus();
+
+            // Auto-test if both servers are running
+            if (systemStatus.frontend === 'running' && systemStatus.backend === 'running') {
+                await testAuth();
+                setTimeout(async () => {
+                    if (authToken) {
+                        await testMessagesWithAuth();
+                    }
+                }, 1000);
+            }
+
+            // Final diagnostic summary
+            setTimeout(() => {
+                let summary = '<h4>📋 Diagnostic Summary:</h4>';
+
+                if (systemStatus.frontend !== 'running') {
+                    summary += '<div class="error">❌ Frontend server is not running (port 5173)</div>';
+                }
+                if (systemStatus.backend !== 'running') {
+                    summary += '<div class="error">❌ Backend server is not running (port 5000)</div>';
+                }
+                if (systemStatus.frontend === 'running' && systemStatus.backend === 'running') {
+                    summary += '<div class="success">✅ Both servers are running</div>';
+                }
+
+                if (!authToken) {
+                    summary += '<div class="error">❌ Authentication failed or not tested</div>';
+                } else {
+                    summary += '<div class="success">✅ Authentication working</div>';
+                }
+
+                summary += '<br><strong>Next Steps:</strong><ul>';
+                summary += '<li>If servers are not running, start them manually</li>';
+                summary += '<li>If authentication fails, check admin credentials</li>';
+                summary += '<li>If API works but frontend doesn\'t, check console errors</li>';
+                summary += '<li>If all tests pass, the issue might be with routing or components</li>';
+                summary += '</ul>';
+
+                updateResult('diagnosticResults', summary);
+            }, 3000);
+        }
+
+        // Auto-run diagnostic on page load
+        window.onload = function () {
+            runFullDiagnostic();
+        };
+    </script>
+</body>
+
+</html>

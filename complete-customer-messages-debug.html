@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToolLink Customer Messages Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔧 ToolLink Customer Messages Complete Debug</h1>
+
+        <div class="info result">
+            <h3>What we're testing:</h3>
+            <ul>
+                <li>Backend API availability</li>
+                <li>Authentication flow</li>
+                <li>Messages API response structure</li>
+                <li>Frontend route accessibility</li>
+                <li>Console errors in browser</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>Step 1: Backend Health Check</h3>
+            <button onclick="testBackend()">Test Backend API</button>
+            <div id="backendResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Step 2: Authentication Test</h3>
+            <button onclick="testAuth()">Login as Admin</button>
+            <div id="authResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Step 3: Messages API Test</h3>
+            <button onclick="testMessagesAPI()">Test Authenticated Messages API</button>
+            <div id="messagesResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Step 4: Frontend Route Test</h3>
+            <button onclick="testFrontendRoute()">Test Frontend Route</button>
+            <button onclick="openMessagesPage()">Open Messages Page</button>
+            <div id="routeResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Step 5: Component Error Analysis</h3>
+            <button onclick="analyzeComponent()">Analyze Component Issues</button>
+            <div id="componentResult"></div>
+        </div>
+    </div>
+
+    <script>
+        let token = null;
+        let user = null;
+
+        async function testBackend() {
+            const resultDiv = document.getElementById('backendResult');
+            try {
+                // Test basic backend connectivity
+                const response = await fetch('http://localhost:5000/api/messages/test');
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success result">
+                            <h4>✅ Backend is working!</h4>
+                            <p>Found ${data.count} messages in database</p>
+                            <details>
+                                <summary>View sample data</summary>
+                                <pre>${JSON.stringify(data.data.slice(0, 2), null, 2)}</pre>
+                            </details>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error result">❌ Backend error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error result">❌ Backend connection failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testAuth() {
+            const resultDiv = document.getElementById('authResult');
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@toollink.com',
+                        password: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    token = data.data.accessToken;
+                    user = data.data.user;
+
+                    // Store in localStorage like the real app does
+                    localStorage.setItem('accessToken', token);
+                    localStorage.setItem('user', JSON.stringify(user));
+
+                    resultDiv.innerHTML = `
+                        <div class="success result">
+                            <h4>✅ Authentication successful!</h4>
+                            <p><strong>Email:</strong> ${user.email}</p>
+                            <p><strong>Role:</strong> ${user.role}</p>
+                            <p><strong>Token:</strong> ${token.substring(0, 50)}...</p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error result">❌ Auth failed: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error result">❌ Auth error: ${error.message}</div>`;
+            }
+        }
+
+        async function testMessagesAPI() {
+            const resultDiv = document.getElementById('messagesResult');
+
+            if (!token) {
+                resultDiv.innerHTML = '<div class="warning result">⚠️ Please login first</div>';
+                return;
+            }
+
+            try {
+                // Test the exact API call the frontend makes
+                const response = await fetch('http://localhost:5000/api/messages', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                resultDiv.innerHTML = `
+                    <div class="${data.success ? 'success' : 'error'} result">
+                        <h4>${data.success ? '✅' : '❌'} Messages API Response</h4>
+                        <p><strong>Status:</strong> ${response.status}</p>
+                        <p><strong>Success:</strong> ${data.success}</p>
+
+                        ${data.success ? `
+                            <p><strong>Response Structure Analysis:</strong></p>
+                            <ul>
+                                <li>data: ${typeof data.data}</li>
+                                <li>data.messages: ${data.data?.messages ? 'Array with ' + data.data.messages.length + ' items' : 'undefined'}</li>
+                                <li>data.pagination: ${data.data?.pagination ? 'Present' : 'undefined'}</li>
+                            </ul>
+
+                            <p><strong>What frontend expects:</strong> response.data.data.messages</p>
+                            <p><strong>What backend provides:</strong> response.data.data.messages ✅</p>
+
+                            <details>
+                                <summary>View full response</summary>
+                                <pre>${JSON.stringify(data, null, 2)}</pre>
+                            </details>
+                        ` : `
+                            <p><strong>Error:</strong> ${data.error}</p>
+                        `}
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error result">❌ API call failed: ${error.message}</div>`;
+            }
+        }
+
+        async function testFrontendRoute() {
+            const resultDiv = document.getElementById('routeResult');
+
+            try {
+                // Test if frontend is responding
+                const response = await fetch('http://localhost:5173');
+
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success result">
+                            <h4>✅ Frontend is accessible</h4>
+                            <p>Main page loads successfully</p>
+                            <p><strong>Next:</strong> Try opening the messages page directly</p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error result">❌ Frontend not accessible (status: ${response.status})</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error result">❌ Frontend connection failed: ${error.message}</div>`;
+            }
+        }
+
+        function openMessagesPage() {
+            // Open in new tab to check for console errors
+            const messagesWindow = window.open('http://localhost:5173/admin/messages', '_blank');
+
+            // Give some instructions
+            document.getElementById('routeResult').innerHTML = `
+                <div class="info result">
+                    <h4>🔍 Manual Check Required</h4>
+                    <p>Opened the messages page in a new tab. Check for:</p>
+                    <ul>
+                        <li><strong>Page Load:</strong> Does it show a login form or admin page?</li>
+                        <li><strong>Console Errors:</strong> Press F12 and check for red errors</li>
+                        <li><strong>Network Tab:</strong> Check if API calls are being made</li>
+                        <li><strong>Authentication:</strong> Are you logged in?</li>
+                    </ul>
+                    <p><strong>Expected:</strong> Should show customer messages or ask you to login</p>
+                </div>
+            `;
+        }
+
+        async function analyzeComponent() {
+            const resultDiv = document.getElementById('componentResult');
+
+            // Check localStorage state
+            const storedToken = localStorage.getItem('accessToken');
+            const storedUser = localStorage.getItem('user');
+
+            resultDiv.innerHTML = `
+                <div class="info result">
+                    <h4>🔍 Component State Analysis</h4>
+
+                    <h5>Authentication State:</h5>
+                    <ul>
+                        <li><strong>Token in localStorage:</strong> ${storedToken ? 'Present (' + storedToken.substring(0, 20) + '...)' : 'Missing'}</li>
+                        <li><strong>User in localStorage:</strong> ${storedUser ? 'Present' : 'Missing'}</li>
+                        <li><strong>Current test token:</strong> ${token ? 'Present' : 'Missing'}</li>
+                    </ul>
+
+                    <h5>Common Issues & Solutions:</h5>
+                    <ul>
+                        <li><strong>Route Protection:</strong> The /admin/messages route requires admin authentication</li>
+                        <li><strong>API Data Structure:</strong> Fixed to handle response.data.data.messages</li>
+                        <li><strong>Token Storage:</strong> Must use 'accessToken' key in localStorage</li>
+                        <li><strong>CORS:</strong> Backend allows frontend origin</li>
+                    </ul>
+
+                    <h5>Next Steps:</h5>
+                    <ol>
+                        <li>Make sure you're logged in as admin in the main app</li>
+                        <li>Navigate to http://localhost:5173/admin/messages</li>
+                        <li>Check browser console for any React/JavaScript errors</li>
+                        <li>Verify the CustomerMessages component is rendering</li>
+                    </ol>
+                </div>
+            `;
+        }
+
+        // Auto-run backend test on load
+        window.onload = function () {
+            testBackend();
+        };
+    </script>
+</body>
+
+</html>

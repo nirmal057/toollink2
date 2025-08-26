@@ -10,8 +10,8 @@ const createTransporter = () => {
     port: 587,
     secure: false, // true for 465, false for other ports
     auth: {
-      user: process.env.TOOLLINK_EMAIL || 'toollink1234@gmail.com',
-      pass: process.env.TOOLLINK_EMAIL_PASSWORD || 'yyyr loge fmgf qyag'
+      user: process.env.TOOLLINK_EMAIL || 'toollinksrilanka@gmail.com',
+      pass: process.env.TOOLLINK_EMAIL_PASSWORD || 'zjhq nlhb rhjw uqxp'
     },
     tls: {
       rejectUnauthorized: false
@@ -450,6 +450,55 @@ const emailTemplates = {
         </div>
       </div>
     `
+  },
+  'test-email': {
+    subject: '✅ ToolLink Email System Test - Configuration Successful',
+    html: (data) => `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
+        <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 28px;">🎉 Email System Test</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">Configuration successful!</p>
+        </div>
+
+        <div style="padding: 30px; background: white;">
+          <h2 style="color: #333; margin-bottom: 20px;">Email Configuration Test Result</h2>
+
+          <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 20px; margin: 25px 0;">
+            <h3 style="color: #155724; margin-top: 0;">✅ Success!</h3>
+            <p style="color: #155724; margin: 10px 0;">
+              ${data.testMessage}
+            </p>
+            <p style="color: #155724; margin: 5px 0;"><strong>Timestamp:</strong> ${data.timestamp}</p>
+          </div>
+
+          <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+            Your ToolLink email system is now configured and working perfectly with:
+          </p>
+
+          <ul style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+            <li>📧 Email: toollinksrilanka@gmail.com</li>
+            <li>🔐 Gmail App Password authentication</li>
+            <li>📤 SMTP sending capability</li>
+            <li>🎯 Customer message reply functionality</li>
+          </ul>
+
+          <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 25px 0;">
+            <h4 style="color: #856404; margin-top: 0;">📋 Next Steps:</h4>
+            <ul style="color: #856404; margin: 10px 0; padding-left: 20px;">
+              <li>Test customer message replies in the admin dashboard</li>
+              <li>Verify that customers receive your responses</li>
+              <li>Monitor email delivery and system performance</li>
+            </ul>
+          </div>
+
+        </div>
+
+        <div style="background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">This is a test email from ToolLink Sri Lanka email system.</p>
+          <p style="margin: 5px 0 0 0;">© ${new Date().getFullYear()} ToolLink Sri Lanka. All rights reserved.</p>
+        </div>
+      </div>
+    `
   }
 };
 
@@ -467,7 +516,7 @@ export const sendEmail = async ({ to, subject, template, data, html, text }) => 
     }
 
     const mailOptions = {
-      from: `${process.env.FROM_NAME || 'ToolLink Admin'} <${process.env.TOOLLINK_EMAIL || 'toollink1234@gmail.com'}>`,
+      from: `${process.env.FROM_NAME || 'ToolLink Sri Lanka'} <${process.env.TOOLLINK_EMAIL || 'toollinksrilanka@gmail.com'}>`,
       to,
       subject: emailSubject,
       html: emailHtml,

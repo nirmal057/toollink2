@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Admin Messages Access</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔧 Customer Messages Admin Access Test</h1>
+
+        <div class="info result">
+            <h3>✅ Issue Fixed!</h3>
+            <p>I found and fixed the customer messages issue:</p>
+            <ul>
+                <li><strong>Missing Route:</strong> Added /admin/messages route to App.tsx</li>
+                <li><strong>Token Issue:</strong> Fixed MessageDashboard to use 'accessToken' instead of 'token'</li>
+                <li><strong>Component:</strong> Using CustomerMessages component for admin interface</li>
+            </ul>
+        </div>
+
+        <h3>Test Steps:</h3>
+        <ol>
+            <li>
+                <button onclick="loginAsAdmin()">1. Login as Admin</button>
+                <div id="loginResult"></div>
+            </li>
+            <li>
+                <button onclick="testMessagesAccess()">2. Test Messages Access</button>
+                <div id="messagesResult"></div>
+            </li>
+            <li>
+                <button onclick="openAdminMessages()">3. Open Admin Messages Page</button>
+            </li>
+        </ol>
+
+        <div class="info result">
+            <h3>🎯 What Was Fixed:</h3>
+            <p><strong>Root Cause:</strong> The sidebar had a link to /admin/messages but this route wasn't defined in
+                App.tsx</p>
+            <p><strong>Solution:</strong> Added the missing route and fixed authentication token usage</p>
+            <p><strong>Result:</strong> Customer messages page should now work correctly in admin section</p>
+        </div>
+    </div>
+
+    <script>
+        async function loginAsAdmin() {
+            const resultDiv = document.getElementById('loginResult');
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@toollink.com',
+                        password: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    localStorage.setItem('accessToken', data.data.accessToken);
+                    localStorage.setItem('user', JSON.stringify(data.data.user));
+                    resultDiv.innerHTML = '<div class="success result">✅ Logged in as admin successfully!</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="error result">❌ Login failed: ' + data.error + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="error result">❌ Login error: ' + error.message + '</div>';
+            }
+        }
+
+        async function testMessagesAccess() {
+            const resultDiv = document.getElementById('messagesResult');
+            try {
+                const token = localStorage.getItem('accessToken');
+                if (!token) {
+                    resultDiv.innerHTML = '<div class="error result">❌ Not logged in. Please login first.</div>';
+                    return;
+                }
+
+                const response = await fetch('http://localhost:5000/api/messages', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    resultDiv.innerHTML = `<div class="success result">✅ Messages API working! Found ${data.data.messages.length} messages</div>`;
+                } else {
+                    resultDiv.innerHTML = '<div class="error result">❌ API failed: ' + data.error + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="error result">❌ API error: ' + error.message + '</div>';
+            }
+        }
+
+        function openAdminMessages() {
+            window.open('http://localhost:5173/admin/messages', '_blank');
+        }
+    </script>
+</body>
+
+</html>

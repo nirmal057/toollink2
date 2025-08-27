@@ -11920,3 +11920,8 @@
 {"duration":"8ms","ip":"::1","level":"http","message":"HTTP Request","method":"POST","service":"toollink-backend","status":401,"timestamp":"2025-08-26 15:17:27","url":"/api/auth/refresh-token","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36","userId":null}
 {"duration":"2ms","ip":"::1","level":"http","message":"HTTP Request","method":"OPTIONS","service":"toollink-backend","status":200,"timestamp":"2025-08-26 15:17:27","url":"/api/auth/logout","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36","userId":null}
 {"duration":"17ms","ip":"::1","level":"http","message":"HTTP Request","method":"POST","service":"toollink-backend","status":200,"timestamp":"2025-08-26 15:17:27","url":"/api/auth/logout","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36","userId":null}
+{"level":"info","message":"Connected to MongoDB Atlas successfully","service":"toollink-backend","timestamp":"2025-08-27 11:27:09"}
+{"level":"info","message":"Admin user already exists","service":"toollink-backend","timestamp":"2025-08-27 11:27:09"}
+{"level":"info","message":"Server running on port 5000","service":"toollink-backend","timestamp":"2025-08-27 11:27:09"}
+{"level":"info","message":"Environment: development","service":"toollink-backend","timestamp":"2025-08-27 11:27:09"}
+{"level":"info","message":"API Documentation: http://localhost:5000/api/docs","service":"toollink-backend","timestamp":"2025-08-27 11:27:09"}

@@ -9,19 +9,16 @@ import User from '../models/User.js';
 
 const router = express.Router();
 
-// Temporary storage for read status (in production, this should be in database)
-const readNotifications = new Set();
-
 // Helper function to create notifications from real data
 const createRealtimeNotifications = async () => {
     try {
         // Get recent orders for notifications
-        const recentOrders = await Order.find({
+        const recentOrders = await Order.find({ 
             createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
         })
-            .populate('customer', 'fullName email')
-            .sort({ createdAt: -1 })
-            .limit(10);
+        .populate('customer', 'fullName email')
+        .sort({ createdAt: -1 })
+        .limit(10);
 
         // Get low stock items for notifications
         const lowStockItems = await Inventory.find({
@@ -33,19 +30,19 @@ const createRealtimeNotifications = async () => {
         const recentDeliveries = await Delivery.find({
             updatedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
         })
-            .populate('orderId', 'orderNumber customer')
-            .populate({
-                path: 'orderId',
-                populate: {
-                    path: 'customer',
-                    select: 'fullName email'
-                }
-            })
-            .sort({ updatedAt: -1 })
-            .limit(10);
+        .populate('orderId', 'orderNumber customer')
+        .populate({
+            path: 'orderId',
+            populate: {
+                path: 'customer',
+                select: 'fullName email'
+            }
+        })
+        .sort({ updatedAt: -1 })
+        .limit(10);
 
         // Get pending users for approval
-        const pendingUsers = await User.find({
+        const pendingUsers = await User.find({ 
             isApproved: false,
             createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // Last 7 days
         }).limit(5);
@@ -74,9 +71,8 @@ const transformToNotifications = (data, userId = null) => {
 
     // Order notifications
     data.recentOrders.forEach(order => {
-        const notificationId = `order_${order._id}_${idCounter++}`;
         notifications.push({
-            _id: notificationId,
+            _id: `order_${idCounter++}`,
             userId: userId,
             type: 'info',
             category: 'order',
@@ -84,7 +80,7 @@ const transformToNotifications = (data, userId = null) => {
             message: `Order ${order.orderNumber} has been placed by ${order.customer?.fullName || 'Customer'} for Rs. ${order.finalAmount?.toLocaleString() || '0'}`,
             priority: order.priority || 'normal',
             status: 'sent',
-            isRead: readNotifications.has(notificationId),
+            isRead: false,
             createdAt: order.createdAt,
             recipient: { specific: false },
             sender: { system: true, name: 'Order System' },
@@ -100,9 +96,8 @@ const transformToNotifications = (data, userId = null) => {
 
     // Low stock notifications
     data.lowStockItems.forEach(item => {
-        const notificationId = `inventory_${item._id}_${idCounter++}`;
         notifications.push({
-            _id: notificationId,
+            _id: `inventory_${idCounter++}`,
             userId: userId,
             type: 'warning',
             category: 'inventory',
@@ -110,7 +105,7 @@ const transformToNotifications = (data, userId = null) => {
             message: `${item.name} is running low on stock. Current: ${item.current_stock} ${item.unit}, Minimum: ${item.min_stock_level} ${item.unit}`,
             priority: 'high',
             status: 'sent',
-            isRead: readNotifications.has(notificationId),
+            isRead: false,
             createdAt: item.updatedAt || item.createdAt,
             recipient: { specific: false },
             sender: { system: true, name: 'Inventory System' },
@@ -135,9 +130,8 @@ const transformToNotifications = (data, userId = null) => {
             'cancelled': 'has been cancelled'
         };
 
-        const notificationId = `delivery_${delivery._id}_${idCounter++}`;
         notifications.push({
-            _id: notificationId,
+            _id: `delivery_${idCounter++}`,
             userId: userId,
             type: delivery.status === 'delivered' ? 'success' : delivery.status === 'failed' ? 'error' : 'info',
             category: 'delivery',
@@ -145,7 +139,7 @@ const transformToNotifications = (data, userId = null) => {
             message: `Delivery for order ${delivery.orderId?.orderNumber || 'N/A'} ${statusMessages[delivery.status] || 'status updated'}`,
             priority: delivery.status === 'failed' ? 'high' : 'normal',
             status: 'sent',
-            isRead: readNotifications.has(notificationId),
+            isRead: false,
             createdAt: delivery.updatedAt,
             recipient: { specific: false },
             sender: { system: true, name: 'Delivery System' },
@@ -162,9 +156,8 @@ const transformToNotifications = (data, userId = null) => {
 
     // User approval notifications
     data.pendingUsers.forEach(user => {
-        const notificationId = `user_${user._id}_${idCounter++}`;
         notifications.push({
-            _id: notificationId,
+            _id: `user_${idCounter++}`,
             userId: userId,
             type: 'info',
             category: 'user',
@@ -172,7 +165,7 @@ const transformToNotifications = (data, userId = null) => {
             message: `${user.fullName || user.username || 'A new user'} has registered and requires approval`,
             priority: 'normal',
             status: 'sent',
-            isRead: readNotifications.has(notificationId),
+            isRead: false,
             createdAt: user.createdAt,
             recipient: { specific: false },
             sender: { system: true, name: 'User System' },
@@ -197,7 +190,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
         // Get real-time data from database
         const realData = await createRealtimeNotifications();
-
+        
         // Transform to notifications format
         let notifications = transformToNotifications(realData, req.user._id);
 
@@ -251,7 +244,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
     try {
         // Get real-time data from database
         const realData = await createRealtimeNotifications();
-
+        
         // Transform to notifications format
         const notifications = transformToNotifications(realData, req.user._id);
 
@@ -298,10 +291,10 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
     try {
         // Get real-time data from database
         const realData = await createRealtimeNotifications();
-
+        
         // Transform to notifications format
         const notifications = transformToNotifications(realData, req.user._id);
-
+        
         const unreadCount = notifications.filter(n => !n.isRead).length;
 
         logger.info(`Unread notifications count: ${unreadCount} for user ${req.user._id}`);
@@ -322,15 +315,18 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
     }
 });
 
+// Temporary storage for read status (in production, this should be in database)
+const readNotifications = new Set();
+
 // Get single notification
 router.get('/:id', authenticateToken, async (req, res) => {
     try {
         // Get real-time data from database
         const realData = await createRealtimeNotifications();
-
+        
         // Transform to notifications format
         const notifications = transformToNotifications(realData, req.user._id);
-
+        
         const notification = notifications.find(n => n._id === req.params.id);
 
         if (!notification) {
@@ -339,6 +335,12 @@ router.get('/:id', authenticateToken, async (req, res) => {
                 error: 'Notification not found',
                 errorType: 'NOTIFICATION_NOT_FOUND'
             });
+        }
+
+        // Check read status from temporary storage
+        if (readNotifications.has(req.params.id)) {
+            notification.isRead = true;
+            notification.readAt = new Date().toISOString();
         }
 
         res.json({
@@ -360,23 +362,26 @@ router.post('/', authorize('admin', 'warehouse', 'cashier'), async (req, res) =>
     try {
         const { userId, type, title, message, priority = 'medium' } = req.body;
 
-        // For now, we'll just log the creation since we're using real-time data
-        // In a production system, this would save to the database
-        logger.info(`Notification creation requested: ${title} by ${req.user.fullName}`);
+        const newNotification = {
+            id: String(mockNotifications.length + 1),
+            userId,
+            type,
+            title,
+            message,
+            priority,
+            read: false,
+            createdAt: new Date().toISOString(),
+            createdBy: req.user._id
+        };
+
+        mockNotifications.push(newNotification);
+
+        logger.info(`Notification created: ${newNotification.id} by ${req.user.fullName}`);
 
         res.status(201).json({
             success: true,
-            message: 'Notification creation logged (real-time notifications active)',
-            data: {
-                id: `custom_${Date.now()}`,
-                userId,
-                type,
-                title,
-                message,
-                priority,
-                createdAt: new Date().toISOString(),
-                createdBy: req.user._id
-            }
+            message: 'Notification created successfully',
+            data: newNotification
         });
     } catch (error) {
         logger.error('Create notification error:', error);
@@ -393,10 +398,10 @@ router.put('/:id/read', authenticateToken, async (req, res) => {
     try {
         // Get real-time data from database
         const realData = await createRealtimeNotifications();
-
+        
         // Transform to notifications format
         const notifications = transformToNotifications(realData, req.user._id);
-
+        
         const notification = notifications.find(n => n._id === req.params.id);
 
         if (!notification) {
@@ -435,15 +440,19 @@ router.put('/mark-all-read', authenticateToken, async (req, res) => {
     try {
         // Get real-time data from database
         const realData = await createRealtimeNotifications();
-
+        
         // Transform to notifications format
         const notifications = transformToNotifications(realData, req.user._id);
-
+        
+        const now = new Date().toISOString();
         let updatedCount = 0;
 
         notifications.forEach(notification => {
             if (!notification.isRead) {
                 readNotifications.add(notification._id);
+                notification.isRead = true;
+                notification.readAt = now;
+                notification.status = 'read';
                 updatedCount++;
             }
         });
@@ -464,15 +473,50 @@ router.put('/mark-all-read', authenticateToken, async (req, res) => {
         });
     }
 });
+                updatedCount++;
+            }
+        });
+
+        res.json({
+            success: true,
+            message: `${updatedCount} notifications marked as read`,
+            data: { updatedCount }
+        });
+    } catch (error) {
+        logger.error('Mark all notifications as read error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to mark all notifications as read',
+            errorType: 'MARK_ALL_READ_ERROR'
+        });
+    }
+});
 
 // Delete notification
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {
-        // Since we're using real-time data, we'll just mark as deleted in our read set
-        // In production, this would delete from database or mark as archived
-        readNotifications.add(`deleted_${req.params.id}`);
+        const notificationIndex = mockNotifications.findIndex(n => n._id === req.params.id);
 
-        logger.info(`Notification ${req.params.id} deleted by user ${req.user._id}`);
+        if (notificationIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                error: 'Notification not found',
+                errorType: 'NOTIFICATION_NOT_FOUND'
+            });
+        }
+
+        const notification = mockNotifications[notificationIndex];
+
+        // Check if user can delete this notification
+        if (notification.userId && notification.userId !== req.user._id.toString()) {
+            return res.status(403).json({
+                success: false,
+                error: 'Access denied',
+                errorType: 'ACCESS_DENIED'
+            });
+        }
+
+        mockNotifications.splice(notificationIndex, 1);
 
         res.json({
             success: true,

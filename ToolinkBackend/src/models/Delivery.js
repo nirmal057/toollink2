@@ -12,26 +12,35 @@ const deliverySchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['scheduled', 'in_transit', 'delivered', 'failed', 'cancelled'],
-        default: 'scheduled'
+        enum: ['pending', 'assigned', 'out_from_warehouse', 'on_the_way', 'delivered', 'failed', 'cancelled'],
+        default: 'pending'
     },
+    customerName: {
+        type: String,
+        required: true
+    },
+    customerPhone: String,
+    customerEmail: String,
+    deliveryAddress: {
+        type: String,
+        required: true
+    },
+    priority: {
+        type: String,
+        enum: ['normal', 'urgent'],
+        default: 'normal'
+    },
+    specialInstructions: String,
+    assignedBy: String, // Role of person who assigned (admin/warehouse)
+    assignedDate: Date,
     scheduledDate: Date,
     estimatedDeliveryTime: Date,
     actualDeliveryTime: Date,
+    deliveredAt: Date,
+    lastUpdated: Date,
     trackingNumber: {
         type: String,
         unique: true
-    },
-    deliveryAddress: {
-        street: String,
-        city: String,
-        state: String,
-        zipCode: String,
-        country: String,
-        coordinates: {
-            latitude: Number,
-            longitude: Number
-        }
     },
     deliveryNotes: String,
     proofOfDelivery: {

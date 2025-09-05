@@ -227,28 +227,9 @@ orderSchema.statics.getStatistics = async function () {
                 processingOrders: { $sum: { $cond: [{ $eq: ['$status', 'processing'] }, 1, 0] } },
                 shippedOrders: { $sum: { $cond: [{ $eq: ['$status', 'shipped'] }, 1, 0] } },
                 deliveredOrders: { $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] } },
-                cancelledOrders: { $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] } },
-                totalRevenue: { $sum: '$finalAmount' },
-                averageOrderValue: { $avg: '$finalAmount' }
+                cancelledOrders: { $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] } }
             }
         }
-    ]);
-
-    // Get monthly revenue
-    const monthlyRevenue = await this.aggregate([
-        { $match: { status: { $in: ['delivered', 'shipped'] } } },
-        {
-            $group: {
-                _id: {
-                    year: { $year: '$createdAt' },
-                    month: { $month: '$createdAt' }
-                },
-                revenue: { $sum: '$finalAmount' },
-                orders: { $sum: 1 }
-            }
-        },
-        { $sort: { '_id.year': -1, '_id.month': -1 } },
-        { $limit: 12 }
     ]);
 
     const result = stats[0] || {
@@ -257,12 +238,8 @@ orderSchema.statics.getStatistics = async function () {
         processingOrders: 0,
         shippedOrders: 0,
         deliveredOrders: 0,
-        cancelledOrders: 0,
-        totalRevenue: 0,
-        averageOrderValue: 0
+        cancelledOrders: 0
     };
-
-    result.monthlyRevenue = monthlyRevenue;
 
     return result;
 };

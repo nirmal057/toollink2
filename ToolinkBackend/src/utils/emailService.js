@@ -451,6 +451,72 @@ const emailTemplates = {
       </div>
     `
   },
+  'driver-welcome': {
+    subject: '🚚 Welcome to ToolLink - Your Driver Account is Ready!',
+    html: (data) => `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; color: #333;">
+        <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 30px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 28px;">🚚 Welcome to ToolLink!</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">Your driver account is ready for action</p>
+        </div>
+
+        <div style="padding: 30px; background: white;">
+          <h2 style="color: #333; margin-bottom: 20px;">Hello ${data.fullName}!</h2>
+
+          <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+            Welcome to the ToolLink delivery team! Your driver account has been successfully created and you're ready to start making deliveries.
+          </p>
+
+          <div style="background: #ddd6fe; border: 1px solid #c4b5fd; border-radius: 8px; padding: 20px; margin: 25px 0;">
+            <h3 style="color: #5b21b6; margin-top: 0;">🎯 Your Account Details</h3>
+            <ul style="margin: 10px 0; padding-left: 20px; line-height: 1.8; color: #5b21b6;">
+              <li><strong>Email:</strong> ${data.email}</li>
+              <li><strong>Name:</strong> ${data.fullName}</li>
+              <li><strong>Phone:</strong> ${data.phone || 'Not provided'}</li>
+              <li><strong>License Number:</strong> ${data.licenseNumber || 'Not provided'}</li>
+              <li><strong>Vehicle:</strong> ${data.vehicleType || 'Not specified'} - ${data.plateNumber || 'No plate'}</li>
+            </ul>
+          </div>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${data.driverPortalUrl || process.env.FRONTEND_URL + '/driver-portal'}" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 16px; display: inline-block;">
+              🚀 Access Driver Portal
+            </a>
+          </div>
+
+          <div style="margin: 25px 0; padding: 20px; background: #ecfdf5; border-radius: 8px; border-left: 4px solid #10b981;">
+            <h3 style="color: #047857; margin-top: 0;">🛣️ What you can do:</h3>
+            <ul style="margin: 10px 0; padding-left: 20px; line-height: 1.8; color: #047857;">
+              <li>View assigned deliveries in real-time</li>
+              <li>Update delivery status as you progress</li>
+              <li>Navigate to customer locations with ease</li>
+              <li>Communicate with dispatch team</li>
+              <li>Track your delivery history and performance</li>
+            </ul>
+          </div>
+
+          <div style="margin: 25px 0; padding: 20px; background: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
+            <h3 style="color: #92400e; margin-top: 0;">📱 How to get started:</h3>
+            <ol style="margin: 10px 0; padding-left: 20px; line-height: 1.8; color: #92400e;">
+              <li>Login to the Driver Portal using your email and password</li>
+              <li>Complete your profile information if needed</li>
+              <li>Check for assigned deliveries</li>
+              <li>Start making deliveries and updating status</li>
+            </ol>
+          </div>
+
+          <p style="font-size: 16px; line-height: 1.6; margin: 25px 0;">
+            If you have any questions or need assistance, please don't hesitate to contact our dispatch team.
+          </p>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 0;">Welcome to the ToolLink delivery team! Drive safely and deliver excellence.</p>
+          <p style="margin: 5px 0 0 0;">© ${new Date().getFullYear()} ToolLink. All rights reserved.</p>
+        </div>
+      </div>
+    `
+  },
   'test-email': {
     subject: '✅ ToolLink Email System Test - Configuration Successful',
     html: (data) => `

@@ -118,6 +118,31 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    // Driver-specific fields
+    licenseNumber: {
+        type: String,
+        trim: true
+    },
+    vehicleInfo: {
+        type: {
+            type: String,
+            trim: true
+        },
+        plateNumber: {
+            type: String,
+            trim: true
+        },
+        capacity: {
+            type: String,
+            trim: true
+        }
+    },
+    rating: {
+        type: Number,
+        min: 0,
+        max: 5,
+        default: 4.5
+    },
     notes: {
         type: String,
         maxlength: 500

@@ -5,6 +5,7 @@ import { authorize, adminOnly, authenticateToken, authOnly } from '../middleware
 import { getDashboardAccess, getRolePermissions } from '../middleware/roleAuth.js';
 import logger from '../utils/logger.js';
 import { AuditLogger } from '../middleware/auditLogger.js';
+import { sendEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
@@ -243,19 +244,6 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
     }
 });
 
-// Test endpoint to debug authentication
-router.get('/test-auth', authenticateToken, async (req, res) => {
-    res.json({
-        success: true,
-        message: 'Authentication working',
-        user: {
-            id: req.user._id,
-            email: req.user.email,
-            role: req.user.role
-        }
-    });
-});
-
 // Get single user
 router.get('/:id', adminOnly, async (req, res) => {
     try {
@@ -314,9 +302,6 @@ router.post('/', adminOnly, [
 
         const { username, email, password, fullName, phone, role, address } = req.body;
 
-        // Debug logging for password
-        logger.info(`Creating user with email: ${email}, role: ${role}, password provided: ${!!password}`);
-
         // Check if user already exists
         const existingUser = await User.findByEmailOrUsername(email);
         if (existingUser) {
@@ -357,6 +342,30 @@ router.post('/', adminOnly, [
 
         // Log after save with password confirmation
         logger.info(`User created: ${user.email} with role ${user.role} (Password set: ${!!user.password})`);
+
+        // Send welcome email for drivers
+        if (role === 'driver') {
+            try {
+                logger.info(`Attempting to send driver welcome email to: ${user.email}`);
+                await sendEmail({
+                    to: user.email,
+                    template: 'driver-welcome',
+                    data: {
+                        fullName: user.fullName,
+                        email: user.email,
+                        phone: user.phone,
+                        licenseNumber: req.body.licenseNumber,
+                        vehicleType: req.body.vehicleType,
+                        plateNumber: req.body.plateNumber,
+                        driverPortalUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/driver-portal`
+                    }
+                });
+                logger.info(`Driver welcome email sent successfully to: ${user.email}`);
+            } catch (emailError) {
+                logger.error('Failed to send driver welcome email:', emailError);
+                // Don't fail the user creation if email fails
+            }
+        }
 
         res.status(201).json({
             success: true,

@@ -133,10 +133,6 @@ router.get('/reports', authenticateToken, authorize('admin'), async (req, res) =
                 byStatus: await Order.aggregate([
                     { $match: { deletedAt: null } },
                     { $group: { _id: '$status', count: { $sum: 1 } } }
-                ]),
-                revenue: await Order.aggregate([
-                    { $match: { deletedAt: null, status: { $in: ['delivered', 'shipped'] } } },
-                    { $group: { _id: null, total: { $sum: '$finalAmount' } } }
                 ])
             },
             inventory: {

@@ -1,8 +1,11 @@
 import express from 'express';
-import { authorize } from '../middleware/auth.js';
+import { authorize, authenticateToken } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
+
+// Apply authentication to all delivery routes
+router.use(authenticateToken);
 
 // Mock delivery data for now
 const mockDeliveries = [

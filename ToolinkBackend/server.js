@@ -23,6 +23,7 @@ import activityRoutes from './src/routes/activity.js';
 import adminRoutes from './src/routes/admin.js';
 import predictionRoutes from './src/routes/predictions.js';
 import messageRoutes from './src/routes/messages.js';
+import enhancedRoutes from './src/routes/enhanced.js';
 
 // Import middleware
 import { authenticateToken } from './src/middleware/auth.js';
@@ -156,6 +157,7 @@ app.use('/api/activity', activityRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/predictions', predictionRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/enhanced', enhancedRoutes);
 
 // Error handling middleware (must be last)
 app.use(notFoundHandler);

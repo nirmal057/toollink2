@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Admin Dashboard Direct Test</title>
 </head>
+
 <body>
     <h1>Admin Dashboard API Test</h1>
     <div id="output"></div>
@@ -12,7 +14,7 @@
         async function testDashboardData() {
             const output = document.getElementById('output');
             output.innerHTML = '<h2>Testing Admin Dashboard Data Loading...</h2>';
-            
+
             try {
                 // Login first
                 const loginResponse = await fetch('http://localhost:5001/api/auth/login', {
@@ -20,13 +22,13 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: 'admin@toollink.com', password: 'admin123' })
                 });
-                
+
                 const loginData = await loginResponse.json();
                 const token = loginData.accessToken;
                 localStorage.setItem('accessToken', token);
-                
+
                 output.innerHTML += '<p>✅ Login successful</p>';
-                
+
                 // Test IntegratedDataService manually
                 const headers = {
                     'Authorization': `Bearer ${token}`,
@@ -92,9 +94,9 @@
 
                 output.innerHTML += `<h3>Dashboard Data:</h3>`;
                 output.innerHTML += `<pre>${JSON.stringify(dashboardData, null, 2)}</pre>`;
-                
+
                 output.innerHTML += '<h2>✅ Dashboard data test complete!</h2>';
-                
+
             } catch (error) {
                 output.innerHTML += `<h2>❌ Error: ${error.message}</h2>`;
                 console.error('Dashboard test error:', error);
@@ -102,4 +104,5 @@
         }
     </script>
 </body>
+
 </html>

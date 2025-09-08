@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>IntegratedDataService Test</title>
 </head>
+
 <body>
     <h1>IntegratedDataService Test</h1>
     <div id="output"></div>
@@ -11,7 +13,7 @@
         // Test the IntegratedDataService directly
         async function testIntegratedDataService() {
             const output = document.getElementById('output');
-            
+
             try {
                 // Get token first
                 const loginResponse = await fetch('http://localhost:5001/api/auth/login', {
@@ -19,15 +21,15 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: 'admin@toollink.com', password: 'admin123' })
                 });
-                
+
                 const loginData = await loginResponse.json();
                 const token = loginData.accessToken;
-                
+
                 // Store token for the service
                 localStorage.setItem('accessToken', token);
-                
+
                 output.innerHTML += '<h2>✅ Login successful</h2>';
-                
+
                 // Test fetching integrated data
                 const headers = {
                     'Authorization': `Bearer ${token}`,
@@ -58,18 +60,18 @@
                 output.innerHTML += `<p>📦 Inventory Items: ${inventory.length}</p>`;
                 output.innerHTML += `<p>🛒 Orders: ${orders.length}</p>`;
                 output.innerHTML += `<p>🚚 Deliveries: ${deliveries.length}</p>`;
-                
+
                 // Test analytics calculation
                 const activeUsers = users.filter(user => user.isActive).length;
                 const completedOrders = orders.filter(order => order.status === 'delivered').length;
-                const totalInventoryValue = inventory.reduce((sum, item) => 
+                const totalInventoryValue = inventory.reduce((sum, item) =>
                     sum + (item.current_stock || 0) * (item.selling_price || 0), 0);
-                
+
                 output.innerHTML += `<h2>Analytics:</h2>`;
                 output.innerHTML += `<p>Active Users: ${activeUsers}/${users.length}</p>`;
                 output.innerHTML += `<p>Completed Orders: ${completedOrders}/${orders.length}</p>`;
                 output.innerHTML += `<p>Total Inventory Value: $${totalInventoryValue.toLocaleString()}</p>`;
-                
+
                 // Show sample data
                 output.innerHTML += `<h2>Sample Data:</h2>`;
                 if (users.length > 0) {
@@ -81,9 +83,9 @@
                 if (orders.length > 0) {
                     output.innerHTML += `<p>First Order: ${orders[0].orderNumber} - Status: ${orders[0].status}</p>`;
                 }
-                
+
                 output.innerHTML += '<h2>✅ IntegratedDataService Test Complete!</h2>';
-                
+
             } catch (error) {
                 output.innerHTML += `<h2>❌ Error: ${error.message}</h2>`;
                 console.error('Test error:', error);
@@ -94,4 +96,5 @@
         testIntegratedDataService();
     </script>
 </body>
+
 </html>

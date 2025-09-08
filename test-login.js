@@ -2,7 +2,7 @@
 async function testLogin() {
     try {
         console.log('Testing login...');
-        
+
         const response = await fetch('http://localhost:5001/api/auth/login', {
             method: 'POST',
             headers: {
@@ -13,14 +13,14 @@ async function testLogin() {
                 password: 'admin123'
             })
         });
-        
+
         const data = await response.json();
         console.log('Login response:', data);
-        
+
         if (data.success) {
             console.log('✅ Login successful!');
             console.log('Access Token:', data.accessToken);
-            
+
             // Test accessing protected route
             const userResponse = await fetch('http://localhost:5001/api/auth/me', {
                 headers: {
@@ -28,7 +28,7 @@ async function testLogin() {
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             const userData = await userResponse.json();
             console.log('User data:', userData);
         } else {

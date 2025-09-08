@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>ToolLink Login Test</title>
 </head>
+
 <body>
     <h1>ToolLink Login Test</h1>
     <form id="loginForm">
@@ -16,20 +18,20 @@
         </div>
         <button type="submit">Login</button>
     </form>
-    
+
     <div id="result"></div>
-    
+
     <script>
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const resultDiv = document.getElementById('result');
-            
+
             try {
                 console.log('Testing login to http://localhost:5001/api/auth/login');
-                
+
                 const response = await fetch('http://localhost:5001/api/auth/login', {
                     method: 'POST',
                     headers: {
@@ -37,22 +39,22 @@
                     },
                     body: JSON.stringify({ email, password })
                 });
-                
+
                 const data = await response.json();
-                
+
                 console.log('Response status:', response.status);
                 console.log('Response data:', data);
-                
+
                 if (data.success) {
                     resultDiv.innerHTML = `
                         <h2>✅ Login Successful!</h2>
                         <p><strong>User:</strong> ${data.user?.name || 'Unknown'}</p>
                         <p><strong>Role:</strong> ${data.user?.role || 'Unknown'}</p>
                         <p><strong>Token:</strong> ${data.accessToken ? 'Received' : 'Missing'}</p>
-                        
+
                         <h3>Testing protected endpoint...</h3>
                     `;
-                    
+
                     // Test protected endpoint
                     const userResponse = await fetch('http://localhost:5001/api/users', {
                         headers: {
@@ -60,16 +62,16 @@
                             'Content-Type': 'application/json'
                         }
                     });
-                    
+
                     const userData = await userResponse.json();
                     console.log('Users data:', userData);
-                    
+
                     if (userData.success) {
                         resultDiv.innerHTML += `<p>✅ Users data fetched successfully: ${userData.data?.length || 0} users</p>`;
                     } else {
                         resultDiv.innerHTML += `<p>❌ Failed to fetch users: ${userData.error}</p>`;
                     }
-                    
+
                 } else {
                     resultDiv.innerHTML = `
                         <h2>❌ Login Failed</h2>
@@ -77,7 +79,7 @@
                         <p><strong>Error Type:</strong> ${data.errorType || 'Unknown'}</p>
                     `;
                 }
-                
+
             } catch (error) {
                 console.error('Login test error:', error);
                 resultDiv.innerHTML = `
@@ -89,4 +91,5 @@
         });
     </script>
 </body>
+
 </html>

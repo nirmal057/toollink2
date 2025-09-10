@@ -16,7 +16,23 @@ const inventorySchema = new mongoose.Schema({
         type: String,
         required: true,
         trim: true,
-        enum: ['Tools', 'Hardware', 'Materials', 'Equipment', 'Safety', 'Electrical', 'Plumbing', 'Other']
+        enum: [
+            'Cement',
+            'Steel & Reinforcement',
+            'Paint & Chemicals',
+            'Electrical Items',
+            'Plumbing Supplies',
+            'Tools & Equipment',
+            'Hardware & Fasteners',
+            'Tiles & Ceramics',
+            'Roofing Materials',
+            'Safety Equipment',
+            'Sand & Aggregate',
+            'Bricks',
+            'Stones',
+            'Materials',
+            'Other'
+        ]
     },
     sku: {
         type: String,
